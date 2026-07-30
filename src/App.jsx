@@ -12,6 +12,7 @@ import {
   Bike, ShoppingBag, Clock, StickyNote, Percent, Copy, Phone, Mail, MapPin,
   Settings, RotateCcw, Menu
 } from 'lucide-react';
+import logoImg from './logo.png';
 
 // ============ DATOS INICIALES (Mock DB) ============
 const INITIAL_PRODUCTS = [
@@ -92,41 +93,7 @@ const aplicarFiltroFecha = (items, rango) => {
 // ============ LOGO LUMEN BASE (ícono fiel al original) ============
 function LumenLogo({ size = 44 }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="lumenGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#58B9C9" />
-          <stop offset="1" stopColor="#3F81A9" />
-        </linearGradient>
-      </defs>
-      {/* Rayos alrededor del gorro */}
-      <g stroke="url(#lumenGrad)" strokeWidth="9" strokeLinecap="round">
-        <line x1="99.5" y1="17" x2="100" y2="32" />
-        <line x1="79" y1="22.5" x2="83" y2="37" />
-        <line x1="121" y1="22" x2="116.5" y2="36.5" />
-        <line x1="59" y1="35.5" x2="66" y2="46.5" />
-        <line x1="141" y1="35" x2="134" y2="46" />
-        <line x1="43" y1="54.5" x2="53" y2="62" />
-        <line x1="156" y1="54" x2="146.5" y2="61.5" />
-        <line x1="37" y1="80.5" x2="52" y2="81.5" />
-        <line x1="162.5" y1="80" x2="148" y2="81" />
-      </g>
-      {/* Gorro de chef (contorno con banda derecha y gancho izquierdo) */}
-      <path d="M89 114 C97 116 108 114 114 110 C117 108 118 106 118 103 L122 80 C131 79 139 71 139 62 C139 53 132 46 124 46 C121 46 118 47 116 49 C117 41 114 33 106 30 C98 27 89 31 86 39 C85 42 85 44 86 47 C81 43 75 43 70 47 C63 52 61 61 65 69 C68 76 73 80 78 82"
-        stroke="url(#lumenGrad)" strokeWidth="8.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M80 87 C81 92 81 97 78 102" stroke="url(#lumenGrad)" strokeWidth="8.5" fill="none" strokeLinecap="round" />
-      {/* Flama con recorte interior (inclinada a la izquierda) */}
-      <path d="M96 50 C102 61 112 68 113 80 C114 91 107 98 99 98 C91 98 84 91 85 80 C86 72 90 66 93 59 C93 67 97 70 99 68 C101 66 95 57 96 50 Z" fill="url(#lumenGrad)" />
-      <path d="M100 74 C104 79 108 83 108 89 C108 94 104 97 100 97 C96 97 92 94 92 89 C92 84 96 79 100 74 Z" fill="white" />
-      {/* Doble L inclinada */}
-      <path d="M80 104 L89 105 L85 150 L76 149 Z" fill="url(#lumenGrad)" />
-      <path d="M53 123 L69 123 L62 155 L77 155 L74 170 L42 170 Z" fill="url(#lumenGrad)" />
-      {/* Campana (cloche) sobre charola con puntas levantadas */}
-      <circle cx="105" cy="120" r="4" fill="url(#lumenGrad)" />
-      <path d="M74 150 C74 133 87 124.5 105 124.5 C123 124.5 136 133 136 150 Z" fill="url(#lumenGrad)" />
-      <path d="M82 144 C83 136 88 130 95 127.5" stroke="white" strokeWidth="3.5" strokeLinecap="round" fill="none" />
-      <rect x="68" y="154" width="80" height="8.5" rx="4" fill="url(#lumenGrad)" />
-    </svg>
+    <img src={logoImg} alt="Lumen Logo" style={{ width: size, height: size, objectFit: 'contain' }} />
   );
 }
 
