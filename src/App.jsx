@@ -93,7 +93,7 @@ const aplicarFiltroFecha = (items, rango) => {
 // ============ LOGO LUMEN BASE (ícono fiel al original) ============
 function LumenLogo({ size = 44 }) {
   return (
-    <img src={logoImg} alt="Lumen Logo" style={{ width: size, height: size, objectFit: 'contain' }} />
+    <img src={logoImg} alt="Lumen Logo" className="mix-blend-multiply" style={{ width: size, height: size, objectFit: 'contain' }} />
   );
 }
 
@@ -2732,7 +2732,7 @@ export default function App() {
   const salir = async () => { await cerrarSesion(); setSesion(null); setNegocioId(null); setNegocios([]); setRol(null); setEstado('login'); };
 
   if (estado === 'cargando') {
-    return <div className="min-h-screen bg-slate-100 flex items-center justify-center"><div className="animate-pulse"><LumenLogo size={72} /></div></div>;
+    return <div className="min-h-screen bg-white flex items-center justify-center"><div className="animate-pulse"><LumenLogo size={72} /></div></div>;
   }
   if (estado === 'login') return <LoginScreen onEntrar={entrar} cargando={entrando} error={errorLogin} />;
   if (estado === 'sin-negocio') return <SinNegocio email={sesion ? sesion.user.email : ''} onCerrarSesion={salir} />;
