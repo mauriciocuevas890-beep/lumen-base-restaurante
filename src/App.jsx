@@ -1264,12 +1264,14 @@ function ViewProductos({ products, onNuevo, onEditar, onEliminar, onToggleFav, o
 }
 
 // ============ MODAL: ESCANER IA ============
-function ScannerModal({ onClose, onGuardar, apiKey, modelo = 'gemini-3.0-flash' }) {
+function ScannerModal({ onClose, onGuardar, apiKey, modelo = 'gpt-4o-mini' }) {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [resultado, setResultado] = useState(null);
+  // platillos: [{nombre, cantidad, precio}]
+  const [platillos, setPlatillos] = useState([]);
   const fileInputRef = useRef(null);
 
   const handleFileChange = (e) => {
@@ -1280,8 +1282,27 @@ function ScannerModal({ onClose, onGuardar, apiKey, modelo = 'gemini-3.0-flash' 
       reader.onload = (ev) => setPreview(ev.target.result);
       reader.readAsDataURL(f);
       setResultado(null);
+      setPlatillos([]);
       setError(null);
     }
+  };
+
+  const updatePlatillo = (i, field, val) => {
+    const updated = platillos.map((p, idx) => idx === i ? { ...p, [field]: val } : p);
+    const total = updated.reduce((sum, p) => sum + (parseFloat(p.precio) || 0), 0);
+    setPlatillos(updated);
+    setResultado(r => ({ ...r, monto: total > 0 ? String(total) : r.monto }));
+  };
+
+  const removePlatillo = (i) => {
+    const updated = platillos.filter((_, idx) => idx !== i);
+    const total = updated.reduce((sum, p) => sum + (parseFloat(p.precio) || 0), 0);
+    setPlatillos(updated);
+    setResultado(r => ({ ...r, monto: total > 0 ? String(total) : r.monto }));
+  };
+
+  const addPlatillo = () => {
+    setPlatillos(p => [...p, { nombre: '', cantidad: '1', precio: '' }]);
   };
 
   const analizarConOpenAI = async () => {
@@ -1296,19 +1317,22 @@ function ScannerModal({ onClose, onGuardar, apiKey, modelo = 'gemini-3.0-flash' 
       const base64Data = preview.split(',')[1];
       const mimeType = file.type;
 
-      const prompt = `Analiza esta nota de consumo o pedido a mano y extrae la siguiente información en formato JSON estricto:
-      {
-        "tipo": "Ingreso",
-        "monto": numero (intenta calcular la suma matemática de los precios si no hay un total escrito explícitamente),
-        "categoria": "Ventas",
-        "descripcion": "Extrae detalladamente TODOS los platillos leídos con su cantidad y precio si lo tienen. Usa este formato: '2x Tacos al pastor ($30), 1x Coca Cola ($20). Notas: Sin cebolla'. Si algún platillo no tiene precio escrito, solo pon el nombre y cantidad.",
-        "fecha": "YYYY-MM-DD" (o déjalo vacío si no la encuentras),
-        "folio": "Numero de ticket o comanda si aplica (o vacio)"
-      }`;
+      const prompt = `Analiza esta nota de pedido, comanda o recibo a mano y responde ÚNICAMENTE con un JSON válido con esta estructura exacta:
+{
+  "tipo": "Ingreso",
+  "categoria": "Ventas",
+  "fecha": "YYYY-MM-DD o vacío",
+  "folio": "número de comanda o ticket si aparece, si no vacío",
+  "metodo": "Efectivo",
+  "platillos": [
+    { "nombre": "Nombre del platillo o producto", "cantidad": número entero, "precio": número o null si no tiene precio }
+  ]
+}
+IMPORTANTE: Extrae TODOS los platillos o productos que veas escritos. Si un platillo no tiene precio escrito, pon null en precio. No incluyas ningún texto fuera del JSON.`;
 
       const res = await fetch(`https://api.openai.com/v1/chat/completions`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`
         },
@@ -1319,37 +1343,40 @@ function ScannerModal({ onClose, onGuardar, apiKey, modelo = 'gemini-3.0-flash' 
               role: "user",
               content: [
                 { type: "text", text: prompt },
-                {
-                  type: "image_url",
-                  image_url: {
-                    url: `data:${mimeType};base64,${base64Data}`
-                  }
-                }
+                { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Data}` } }
               ]
             }
           ],
           response_format: { type: "json_object" }
         })
       });
-      
+
       const data = await res.json();
       if (data.error) throw new Error(data.error.message);
-      
+
       const textoRespuesta = data.choices[0].message.content;
       const cleanTexto = textoRespuesta.replace(/```json/gi, '').replace(/```/g, '').trim();
       const jsonParsed = JSON.parse(cleanTexto);
-      
+
+      const lista = (jsonParsed.platillos || []).map(p => ({
+        nombre: p.nombre || '',
+        cantidad: String(p.cantidad || 1),
+        precio: p.precio != null ? String(p.precio) : ''
+      }));
+
+      const total = lista.reduce((sum, p) => sum + (parseFloat(p.precio) || 0), 0);
+
+      setPlatillos(lista);
       setResultado({
-        tipo: jsonParsed.tipo || 'Ingreso',
-        monto: String(jsonParsed.monto || ''),
-        categoria: jsonParsed.categoria || 'Ventas',
-        descripcion: jsonParsed.descripcion || '',
+        tipo: 'Ingreso',
+        monto: total > 0 ? String(total) : '',
+        categoria: 'Ventas',
         folio: jsonParsed.folio || '',
-        metodo: 'Efectivo', // Default
+        metodo: jsonParsed.metodo || 'Efectivo',
         pagado: true,
       });
     } catch (err) {
-      if (err.message.includes('API_KEY_INVALID') || err.message.includes('API key not valid')) {
+      if (err.message.includes('Incorrect API key') || err.message.includes('API key not valid')) {
         setError('Tu API Key no es válida. Revisa que la hayas copiado bien en Ajustes.');
       } else {
         setError('Error al analizar la imagen. Detalle: ' + err.message);
@@ -1361,124 +1388,161 @@ function ScannerModal({ onClose, onGuardar, apiKey, modelo = 'gemini-3.0-flash' 
   };
 
   const handleSave = () => {
-    if (!resultado.monto || isNaN(resultado.monto) || Number(resultado.monto) <= 0) {
-      setError('El monto debe ser mayor a 0');
+    const platillosValidos = platillos.filter(p => p.nombre.trim());
+    if (platillosValidos.length === 0) {
+      setError('Agrega al menos un platillo con nombre.');
       return;
     }
-    if (!resultado.descripcion.trim()) {
-      setError('Añade una descripción');
-      return;
-    }
+    const descripcion = platillosValidos
+      .map(p => `${p.cantidad}x ${p.nombre}${p.precio ? ` ($${p.precio})` : ''}`)
+      .join(', ');
+    const montoFinal = parseFloat(resultado.monto) || 0;
     onGuardar({
       ...resultado,
+      descripcion,
       id: `mov-${Date.now()}`,
-      monto: Number(resultado.monto),
-      ts: Date.now() // Si se extrajo una fecha específica, podría parsearse aquí en el futuro
+      monto: montoFinal,
+      ts: Date.now()
     });
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="bg-white rounded-3xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col md:flex-row" onClick={e => e.stopPropagation()}>
-        
+      <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col md:flex-row" onClick={e => e.stopPropagation()}>
+
         {/* Columna Izquierda: Imagen */}
-        <div className="md:w-1/2 p-6 border-b md:border-b-0 md:border-r border-gray-100 flex flex-col">
+        <div className="md:w-5/12 p-6 border-b md:border-b-0 md:border-r border-gray-100 flex flex-col">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-black text-gray-900">Escáner IA</h2>
             <button onClick={onClose} className="md:hidden p-2 hover:bg-gray-100 rounded-full"><X className="w-5 h-5 text-gray-600" /></button>
           </div>
-          
-          <div 
-            onClick={() => !loading && fileInputRef.current.click()} 
-            className={`flex-1 min-h-[300px] border-2 border-dashed ${preview ? 'border-gray-200' : 'border-blue-300 bg-blue-50/50'} rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 overflow-hidden relative`}
+
+          <div
+            onClick={() => !loading && fileInputRef.current.click()}
+            className={`flex-1 min-h-[260px] border-2 border-dashed ${preview ? 'border-gray-200' : 'border-blue-300 bg-blue-50/50'} rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 overflow-hidden relative`}
           >
             {preview ? (
               <img src={preview} alt="Documento" className="w-full h-full object-contain" />
             ) : (
               <div className="text-center p-6">
                 <Camera className="w-12 h-12 text-blue-500 mx-auto mb-3" />
-                <p className="font-bold text-gray-700">Toca para subir un recibo</p>
+                <p className="font-bold text-gray-700">Toca para subir la comanda</p>
                 <p className="text-sm text-gray-500 mt-1">Soporta JPG y PNG</p>
               </div>
             )}
             {loading && (
               <div className="absolute inset-0 bg-white/80 flex flex-col items-center justify-center backdrop-blur-sm">
-                <div className="animate-spin rounded-full h-10 w-10 border-4 border-blue-200 border-t-blue-600 mb-3"></div>
-                <p className="font-bold text-blue-800 text-sm animate-pulse">Analizando con IA...</p>
+                <div className="animate-spin rounded-full h-10 w-10 border-4 border-purple-200 border-t-purple-600 mb-3"></div>
+                <p className="font-bold text-purple-800 text-sm animate-pulse">Analizando con IA...</p>
               </div>
             )}
           </div>
           <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
-          
+
           {preview && !resultado && !loading && (
             <button onClick={analizarConOpenAI} className="mt-4 w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3.5 rounded-xl shadow-lg flex items-center justify-center gap-2">
-              <Star className="w-5 h-5" /> Extraer datos automáticamente
+              <Star className="w-5 h-5" /> Extraer platillos
             </button>
           )}
         </div>
 
-        {/* Columna Derecha: Formulario (Resultados) */}
-        <div className="md:w-1/2 p-6 flex flex-col">
+        {/* Columna Derecha: Formulario */}
+        <div className="md:w-7/12 p-6 flex flex-col">
           <div className="hidden md:flex justify-end mb-2">
             <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full"><X className="w-5 h-5 text-gray-600" /></button>
           </div>
-          
+
           {!resultado ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-gray-400">
               <Receipt className="w-16 h-16 text-gray-200 mb-4" />
-              <p className="font-bold">Sube una imagen y presiona Extraer</p>
-              <p className="text-sm mt-2">La IA leerá automáticamente el monto, fecha y concepto del ticket.</p>
+              <p className="font-bold">Sube la foto de una comanda</p>
+              <p className="text-sm mt-2">La IA leerá los platillos uno por uno para que puedas revisarlos y editarlos antes de guardar.</p>
               {error && <p className="text-rose-500 text-sm font-bold mt-4 p-3 bg-rose-50 rounded-lg">{error}</p>}
             </div>
           ) : (
             <div className="flex-1 flex flex-col">
-              <h3 className="font-black text-gray-900 mb-4 flex items-center gap-2 text-lg">
-                <Check className="w-5 h-5 text-emerald-500" /> Revisa y confirma
+              <h3 className="font-black text-gray-900 mb-1 flex items-center gap-2 text-lg">
+                <Check className="w-5 h-5 text-emerald-500" /> Revisa y edita la comanda
               </h3>
-              
-              <div className="space-y-4 flex-1 overflow-y-auto pr-2">
-                <div className="bg-gray-100 rounded-full p-1 flex">
-                  {['Gasto', 'Ingreso'].map(t => (
-                    <button key={t} onClick={() => setResultado({...resultado, tipo: t})} className={`flex-1 py-1.5 rounded-full text-sm font-bold ${resultado.tipo === t ? 'bg-white shadow-sm text-blue-600' : 'text-gray-600'}`}>{t}</button>
-                  ))}
+              <p className="text-xs text-gray-500 mb-4">Edita nombre, cantidad o precio de cada platillo. Puedes borrar filas o añadir nuevas.</p>
+
+              <div className="flex-1 overflow-y-auto space-y-2 pr-1 mb-4">
+                {/* Cabecera de tabla */}
+                <div className="grid grid-cols-12 gap-2 px-1">
+                  <span className="col-span-1 text-xs font-bold text-gray-400 uppercase text-center">Cant</span>
+                  <span className="col-span-7 text-xs font-bold text-gray-400 uppercase">Platillo</span>
+                  <span className="col-span-3 text-xs font-bold text-gray-400 uppercase text-right">Precio</span>
+                  <span className="col-span-1"></span>
                 </div>
-                
-                <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5">Monto total</label>
-                  <div className="flex items-center border border-gray-200 rounded-xl px-3 py-3 focus-within:border-blue-500">
-                    <DollarSign className="w-5 h-5 text-gray-400 mr-2 shrink-0" />
-                    <input type="number" step="0.01" value={resultado.monto} onChange={e => setResultado({...resultado, monto: e.target.value})} className="outline-none w-full font-bold text-gray-900" />
+
+                {platillos.map((p, i) => (
+                  <div key={i} className="grid grid-cols-12 gap-2 items-center bg-gray-50 rounded-xl px-2 py-1.5 group">
+                    <input
+                      type="number" min="1" value={p.cantidad}
+                      onChange={e => updatePlatillo(i, 'cantidad', e.target.value)}
+                      className="col-span-1 outline-none bg-transparent text-center font-bold text-gray-700 w-full text-sm"
+                    />
+                    <input
+                      type="text" value={p.nombre} placeholder="Nombre del platillo"
+                      onChange={e => updatePlatillo(i, 'nombre', e.target.value)}
+                      className="col-span-7 outline-none bg-transparent font-medium text-gray-900 text-sm w-full"
+                    />
+                    <div className="col-span-3 flex items-center">
+                      <span className="text-gray-400 text-sm mr-1">$</span>
+                      <input
+                        type="number" min="0" step="0.01" value={p.precio} placeholder="—"
+                        onChange={e => updatePlatillo(i, 'precio', e.target.value)}
+                        className="outline-none bg-transparent font-bold text-gray-900 text-sm w-full text-right"
+                      />
+                    </div>
+                    <button onClick={() => removePlatillo(i)} className="col-span-1 opacity-0 group-hover:opacity-100 transition-opacity flex justify-center">
+                      <X className="w-4 h-4 text-rose-400 hover:text-rose-600" />
+                    </button>
+                  </div>
+                ))}
+
+                <button onClick={addPlatillo} className="w-full py-2 border-2 border-dashed border-gray-200 rounded-xl text-sm font-bold text-gray-400 hover:border-purple-300 hover:text-purple-500 transition-colors flex items-center justify-center gap-1">
+                  + Agregar platillo
+                </button>
+              </div>
+
+              {/* Monto total, método y categoría */}
+              <div className="border-t border-gray-100 pt-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold text-gray-500">Total</span>
+                  <div className="flex items-center border border-gray-200 rounded-xl px-3 py-2 focus-within:border-blue-500 w-36">
+                    <DollarSign className="w-4 h-4 text-gray-400 mr-1 shrink-0" />
+                    <input type="number" step="0.01" value={resultado.monto}
+                      onChange={e => setResultado({...resultado, monto: e.target.value})}
+                      className="outline-none w-full font-bold text-gray-900 text-right" />
                   </div>
                 </div>
 
-                <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5">Descripción</label>
-                  <textarea rows="4" value={resultado.descripcion} onChange={e => setResultado({...resultado, descripcion: e.target.value})} className="w-full border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500 font-medium resize-none" />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5">Categoría</label>
-                    <select value={resultado.categoria} onChange={e => setResultado({...resultado, categoria: e.target.value})} className="w-full border border-gray-200 rounded-xl px-3 py-3 outline-none focus:border-blue-500 bg-white">
-                      {['Sin categoría', 'General', 'Renta', 'Gestión', 'Nómina', 'Servicios', 'Mantenimiento', 'Alimentos', 'Marketing', 'Préstamos', 'Mobiliario o Equipo', 'Transporte'].map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5">Método</label>
-                    <select value={resultado.metodo} onChange={e => setResultado({...resultado, metodo: e.target.value})} className="w-full border border-gray-200 rounded-xl px-3 py-3 outline-none focus:border-blue-500 bg-white">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Método</label>
+                    <select value={resultado.metodo} onChange={e => setResultado({...resultado, metodo: e.target.value})} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-blue-500 bg-white text-sm">
                       {['Efectivo', 'Tarjeta', 'Transferencia', 'Otro'].map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Categoría</label>
+                    <select value={resultado.categoria} onChange={e => setResultado({...resultado, categoria: e.target.value})} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-blue-500 bg-white text-sm">
+                      {['Ventas', 'Sin categoría', 'General', 'Alimentos', 'Marketing'].map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
                 </div>
-                
-                {error && <p className="text-rose-500 text-sm font-bold bg-rose-50 p-3 rounded-xl">{error}</p>}
-              </div>
 
-              <div className="pt-4 mt-4 border-t border-gray-100 flex gap-3">
-                <button onClick={() => setResultado(null)} className="px-5 py-3.5 border border-gray-200 hover:bg-gray-50 rounded-xl font-bold text-gray-700">Reescanear</button>
-                <button onClick={handleSave} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-xl shadow-lg flex items-center justify-center gap-2">
-                  <Check className="w-5 h-5" /> Guardar registro
-                </button>
+                {error && <p className="text-rose-500 text-sm font-bold bg-rose-50 p-3 rounded-xl">{error}</p>}
+
+                <div className="flex gap-3 pt-1">
+                  <button onClick={() => { setResultado(null); setPlatillos([]); }} className="px-5 py-3 border border-gray-200 hover:bg-gray-50 rounded-xl font-bold text-gray-700 text-sm">
+                    Reescanear
+                  </button>
+                  <button onClick={handleSave} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl shadow-lg flex items-center justify-center gap-2 text-sm">
+                    <Check className="w-4 h-4" /> Guardar venta
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -1487,6 +1551,8 @@ function ScannerModal({ onClose, onGuardar, apiKey, modelo = 'gemini-3.0-flash' 
     </div>
   );
 }
+
+
 
 // ============ PANEL: NUEVA TRANSACCIÓN ============
 function NuevaTransaccion({ onClose, onGuardar, inicial }) {
