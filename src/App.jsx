@@ -2049,6 +2049,59 @@ const AjInput = ({ d, set, label, k, placeholder, req }) => (
   </div>
 );
 
+function GeminiModelSelector({ d, set }) {
+  const [modelos, setModelos] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const cargarModelos = async () => {
+    if (!d.geminiApiKey) {
+      setError('Primero ingresa tu API Key arriba');
+      return;
+    }
+    setLoading(true); setError(null);
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${d.geminiApiKey}`);
+      const data = await res.json();
+      if (data.error) throw new Error(data.error.message);
+      const validos = (data.models || [])
+        .filter(m => m.supportedGenerationMethods?.includes('generateContent'))
+        .map(m => m.name.replace('models/', ''));
+      setModelos(validos);
+      if (validos.length > 0 && !validos.includes(d.geminiModelo)) {
+        set('geminiModelo', validos[0]);
+      }
+    } catch(err) {
+      if (err.message.includes('API_KEY_INVALID')) setError('API Key no válida.');
+      else setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="mt-4 border-t border-gray-100 pt-5">
+      <div className="flex items-center justify-between mb-2">
+        <label className="text-sm font-bold text-gray-700">Modelo de IA (Avanzado)</label>
+        <button onClick={cargarModelos} disabled={loading} className="text-xs font-bold text-blue-600 hover:underline">
+          {loading ? 'Cargando...' : 'Cargar modelos disponibles'}
+        </button>
+      </div>
+      
+      {modelos.length > 0 ? (
+        <select value={d.geminiModelo} onChange={e => set('geminiModelo', e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-3 outline-none focus:border-blue-500 bg-white">
+          {modelos.map(m => <option key={m} value={m}>{m}</option>)}
+        </select>
+      ) : (
+        <input value={d.geminiModelo} onChange={e => set('geminiModelo', e.target.value)} placeholder="gemini-1.5-pro" className="w-full border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500 font-medium" />
+      )}
+      
+      {error && <p className="text-rose-500 text-xs font-bold mt-2">{error}</p>}
+      <p className="text-xs text-gray-500 mt-2">Si el modelo por defecto marca error, haz clic en "Cargar modelos" para ver los que tu API Key tiene permitidos.</p>
+    </div>
+  );
+}
+
 function ViewAjustes({ ajustes, onGuardar, initialTab }) {
   const [tab, setTab] = useState(initialTab || 'General');
   const [d, setD] = useState(ajustes);
@@ -2308,8 +2361,7 @@ function ViewAjustes({ ajustes, onGuardar, initialTab }) {
             <p className="text-sm text-gray-600 mb-4">Ingresa tu clave de API gratuita de Google Gemini para habilitar el escaneo inteligente de recibos y facturas en la sección de Finanzas.</p>
             <AjInput d={d} set={set} label="Gemini API Key" k="geminiApiKey" placeholder="AIzaSyB..." />
             <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-blue-600 font-bold text-sm hover:underline mt-2 mb-6 inline-block">Obtener mi API Key gratuita</a>
-            <AjInput d={d} set={set} label="Modelo de IA (Avanzado)" k="geminiModelo" placeholder="gemini-3.0-flash" />
-            <p className="text-xs text-gray-500 mt-1">Si obtienes un error de modelo no encontrado, puedes cambiar la versión aquí (ej: gemini-1.5-pro, gemini-3.0-flash).</p>
+            <GeminiModelSelector d={d} set={set} />
           </Card>
         </div>
       )}
