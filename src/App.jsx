@@ -1289,14 +1289,14 @@ function ScannerModal({ onClose, onGuardar, apiKey, modelo = 'gpt-4o-mini', prod
 
   const updatePlatillo = (i, field, val) => {
     const updated = platillos.map((p, idx) => idx === i ? { ...p, [field]: val } : p);
-    const total = updated.reduce((sum, p) => sum + (parseFloat(p.precio) || 0), 0);
+    const total = updated.reduce((sum, p) => sum + ((parseFloat(p.precio) || 0) * (parseInt(p.cantidad) || 1)), 0);
     setPlatillos(updated);
     setResultado(r => ({ ...r, monto: total > 0 ? String(total) : r.monto }));
   };
 
   const removePlatillo = (i) => {
     const updated = platillos.filter((_, idx) => idx !== i);
-    const total = updated.reduce((sum, p) => sum + (parseFloat(p.precio) || 0), 0);
+    const total = updated.reduce((sum, p) => sum + ((parseFloat(p.precio) || 0) * (parseInt(p.cantidad) || 1)), 0);
     setPlatillos(updated);
     setResultado(r => ({ ...r, monto: total > 0 ? String(total) : r.monto }));
   };
@@ -1373,7 +1373,7 @@ No incluyas ningún texto fuera del JSON.`;
         precio: p.precio != null ? String(p.precio) : ''
       }));
 
-      const total = lista.reduce((sum, p) => sum + (parseFloat(p.precio) || 0), 0);
+      const total = lista.reduce((sum, p) => sum + ((parseFloat(p.precio) || 0) * (parseInt(p.cantidad) || 1)), 0);
 
       setPlatillos(lista);
       const today = new Date().toISOString().split('T')[0];
@@ -1489,32 +1489,36 @@ No incluyas ningún texto fuera del JSON.`;
 
               <div className="flex-1 overflow-y-auto space-y-2 pr-1 mb-4">
                 {/* Cabecera de tabla */}
-                <div className="grid grid-cols-12 gap-2 px-1">
-                  <span className="col-span-1 text-xs font-bold text-gray-400 uppercase text-center">Cant</span>
-                  <span className="col-span-7 text-xs font-bold text-gray-400 uppercase">Platillo</span>
-                  <span className="col-span-3 text-xs font-bold text-gray-400 uppercase text-right">Precio</span>
+                <div className="grid grid-cols-12 gap-1 md:gap-2 px-1">
+                  <span className="col-span-2 md:col-span-1 text-xs font-bold text-gray-400 uppercase text-center">Cant</span>
+                  <span className="col-span-4 md:col-span-5 text-xs font-bold text-gray-400 uppercase">Platillo</span>
+                  <span className="col-span-3 text-xs font-bold text-gray-400 uppercase text-right" title="Precio Unitario">P. Unit</span>
+                  <span className="col-span-2 text-xs font-bold text-gray-400 uppercase text-right">Total</span>
                   <span className="col-span-1"></span>
                 </div>
 
                 {platillos.map((p, i) => (
-                  <div key={i} className="grid grid-cols-12 gap-2 items-center bg-gray-50 rounded-xl px-2 py-1.5 group">
+                  <div key={i} className="grid grid-cols-12 gap-1 md:gap-2 items-center bg-gray-50 rounded-xl px-1 md:px-2 py-1.5 group">
                     <input
                       type="number" min="1" value={p.cantidad}
                       onChange={e => updatePlatillo(i, 'cantidad', e.target.value)}
-                      className="col-span-1 outline-none bg-transparent text-center font-bold text-gray-700 w-full text-sm"
+                      className="col-span-2 md:col-span-1 outline-none bg-transparent text-center font-bold text-gray-700 w-full text-sm"
                     />
                     <input
-                      type="text" value={p.nombre} placeholder="Nombre del platillo"
+                      type="text" value={p.nombre} placeholder="Platillo"
                       onChange={e => updatePlatillo(i, 'nombre', e.target.value)}
-                      className="col-span-7 outline-none bg-transparent font-medium text-gray-900 text-sm w-full"
+                      className="col-span-4 md:col-span-5 outline-none bg-transparent font-medium text-gray-900 text-sm w-full"
                     />
-                    <div className="col-span-3 flex items-center">
-                      <span className="text-gray-400 text-sm mr-1">$</span>
+                    <div className="col-span-3 flex items-center justify-end">
+                      <span className="text-gray-400 text-sm mr-0.5 md:mr-1">$</span>
                       <input
                         type="number" min="0" step="0.01" value={p.precio} placeholder="—"
                         onChange={e => updatePlatillo(i, 'precio', e.target.value)}
-                        className="outline-none bg-transparent font-bold text-gray-900 text-sm w-full text-right"
+                        className="outline-none bg-transparent font-bold text-gray-900 text-sm w-full text-right max-w-[60px] md:max-w-full"
                       />
+                    </div>
+                    <div className="col-span-2 text-right font-bold text-blue-600 text-sm overflow-hidden text-ellipsis">
+                      {p.precio ? `$${((parseFloat(p.precio) || 0) * (parseInt(p.cantidad) || 1)).toLocaleString('es-MX', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '—'}
                     </div>
                     <button onClick={() => removePlatillo(i)} className="col-span-1 opacity-0 group-hover:opacity-100 transition-opacity flex justify-center">
                       <X className="w-4 h-4 text-rose-400 hover:text-rose-600" />
