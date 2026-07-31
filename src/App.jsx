@@ -10,7 +10,7 @@ import {
   ChevronDown, ChevronRight, ChevronLeft, MoreHorizontal, Save,
   TrendingUp, TrendingDown, Receipt, Filter, FolderOpen, Users, Utensils,
   Bike, ShoppingBag, Clock, StickyNote, Percent, Copy, Phone, Mail, MapPin,
-  Settings, RotateCcw, Menu
+  Settings, RotateCcw, Menu, Camera
 } from 'lucide-react';
 import logoImg from './logo.png';
 
@@ -49,6 +49,8 @@ const AJUSTES_DEFAULT = {
   // Impresoras
   impresoras: [{ id: 'imp1', nombre: 'Impresora de Tickets', estado: 'Sin configurar' }],
   areasVenta: ['Barra', 'Sin área de venta', 'Cocina'],
+  // IA
+  geminiApiKey: '',
 };
 
 // ============ FUNCIONES DE FECHA Y FILTROS ============
@@ -1260,6 +1262,213 @@ function ViewProductos({ products, onNuevo, onEditar, onEliminar, onToggleFav, o
   );
 }
 
+// ============ MODAL: ESCANER IA ============
+function ScannerModal({ onClose, onGuardar, apiKey }) {
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [resultado, setResultado] = useState(null);
+  const fileInputRef = useRef(null);
+
+  const handleFileChange = (e) => {
+    const f = e.target.files[0];
+    if (f) {
+      setFile(f);
+      const reader = new FileReader();
+      reader.onload = (ev) => setPreview(ev.target.result);
+      reader.readAsDataURL(f);
+      setResultado(null);
+      setError(null);
+    }
+  };
+
+  const analizarConGemini = async () => {
+    if (!file) return;
+    if (!apiKey) {
+      setError('Por favor configura tu API Key de Gemini en la pestaña Ajustes > IA.');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const base64Data = preview.split(',')[1];
+      const mimeType = file.type;
+
+      const prompt = `Analiza este recibo o factura y extrae la siguiente información en formato JSON estricto:
+      {
+        "tipo": "Gasto" o "Ingreso" (si es un ticket de compra es Gasto, si es un ticket de venta tuya es Ingreso),
+        "monto": numero (solo el total numérico),
+        "categoria": "General", "Renta", "Servicios", "Alimentos", "Transporte", "Mantenimiento" o "Sin categoría",
+        "descripcion": "Nombre del proveedor o descripción breve",
+        "fecha": "YYYY-MM-DD" (o déjalo vacío si no la encuentras),
+        "folio": "Numero de ticket o factura si aplica (o vacio)"
+      }`;
+
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: prompt },
+              { inline_data: { mime_type: mimeType, data: base64Data } }
+            ]
+          }],
+          generationConfig: { response_mime_type: "application/json" }
+        })
+      });
+      
+      const data = await res.json();
+      if (data.error) throw new Error(data.error.message);
+      
+      const textoRespuesta = data.candidates[0].content.parts[0].text;
+      const jsonParsed = JSON.parse(textoRespuesta);
+      setResultado({
+        tipo: jsonParsed.tipo || 'Gasto',
+        monto: String(jsonParsed.monto || ''),
+        categoria: jsonParsed.categoria || 'Sin categoría',
+        descripcion: jsonParsed.descripcion || '',
+        folio: jsonParsed.folio || '',
+        metodo: 'Efectivo', // Default
+        pagado: true,
+      });
+    } catch (err) {
+      setError('Error al analizar la imagen. Intenta con otra imagen más clara o revisa tu API Key.');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = () => {
+    if (!resultado.monto || isNaN(resultado.monto) || Number(resultado.monto) <= 0) {
+      setError('El monto debe ser mayor a 0');
+      return;
+    }
+    if (!resultado.descripcion.trim()) {
+      setError('Añade una descripción');
+      return;
+    }
+    onGuardar({
+      ...resultado,
+      id: `mov-${Date.now()}`,
+      monto: Number(resultado.monto),
+      ts: Date.now() // Si se extrajo una fecha específica, podría parsearse aquí en el futuro
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="bg-white rounded-3xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col md:flex-row" onClick={e => e.stopPropagation()}>
+        
+        {/* Columna Izquierda: Imagen */}
+        <div className="md:w-1/2 p-6 border-b md:border-b-0 md:border-r border-gray-100 flex flex-col">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-black text-gray-900">Escáner IA</h2>
+            <button onClick={onClose} className="md:hidden p-2 hover:bg-gray-100 rounded-full"><X className="w-5 h-5 text-gray-600" /></button>
+          </div>
+          
+          <div 
+            onClick={() => !loading && fileInputRef.current.click()} 
+            className={`flex-1 min-h-[300px] border-2 border-dashed ${preview ? 'border-gray-200' : 'border-blue-300 bg-blue-50/50'} rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 overflow-hidden relative`}
+          >
+            {preview ? (
+              <img src={preview} alt="Documento" className="w-full h-full object-contain" />
+            ) : (
+              <div className="text-center p-6">
+                <Camera className="w-12 h-12 text-blue-500 mx-auto mb-3" />
+                <p className="font-bold text-gray-700">Toca para subir un recibo</p>
+                <p className="text-sm text-gray-500 mt-1">Soporta JPG y PNG</p>
+              </div>
+            )}
+            {loading && (
+              <div className="absolute inset-0 bg-white/80 flex flex-col items-center justify-center backdrop-blur-sm">
+                <div className="animate-spin rounded-full h-10 w-10 border-4 border-blue-200 border-t-blue-600 mb-3"></div>
+                <p className="font-bold text-blue-800 text-sm animate-pulse">Analizando con IA...</p>
+              </div>
+            )}
+          </div>
+          <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
+          
+          {preview && !resultado && !loading && (
+            <button onClick={analizarConGemini} className="mt-4 w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3.5 rounded-xl shadow-lg flex items-center justify-center gap-2">
+              <Star className="w-5 h-5" /> Extraer datos automáticamente
+            </button>
+          )}
+        </div>
+
+        {/* Columna Derecha: Formulario (Resultados) */}
+        <div className="md:w-1/2 p-6 flex flex-col">
+          <div className="hidden md:flex justify-end mb-2">
+            <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full"><X className="w-5 h-5 text-gray-600" /></button>
+          </div>
+          
+          {!resultado ? (
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-gray-400">
+              <Receipt className="w-16 h-16 text-gray-200 mb-4" />
+              <p className="font-bold">Sube una imagen y presiona Extraer</p>
+              <p className="text-sm mt-2">La IA leerá automáticamente el monto, fecha y concepto del ticket.</p>
+              {error && <p className="text-rose-500 text-sm font-bold mt-4 p-3 bg-rose-50 rounded-lg">{error}</p>}
+            </div>
+          ) : (
+            <div className="flex-1 flex flex-col">
+              <h3 className="font-black text-gray-900 mb-4 flex items-center gap-2 text-lg">
+                <Check className="w-5 h-5 text-emerald-500" /> Revisa y confirma
+              </h3>
+              
+              <div className="space-y-4 flex-1 overflow-y-auto pr-2">
+                <div className="bg-gray-100 rounded-full p-1 flex">
+                  {['Gasto', 'Ingreso'].map(t => (
+                    <button key={t} onClick={() => setResultado({...resultado, tipo: t})} className={`flex-1 py-1.5 rounded-full text-sm font-bold ${resultado.tipo === t ? 'bg-white shadow-sm text-blue-600' : 'text-gray-600'}`}>{t}</button>
+                  ))}
+                </div>
+                
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5">Monto total</label>
+                  <div className="flex items-center border border-gray-200 rounded-xl px-3 py-3 focus-within:border-blue-500">
+                    <DollarSign className="w-5 h-5 text-gray-400 mr-2 shrink-0" />
+                    <input type="number" step="0.01" value={resultado.monto} onChange={e => setResultado({...resultado, monto: e.target.value})} className="outline-none w-full font-bold text-gray-900" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5">Descripción</label>
+                  <input value={resultado.descripcion} onChange={e => setResultado({...resultado, descripcion: e.target.value})} className="w-full border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500 font-medium" />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5">Categoría</label>
+                    <select value={resultado.categoria} onChange={e => setResultado({...resultado, categoria: e.target.value})} className="w-full border border-gray-200 rounded-xl px-3 py-3 outline-none focus:border-blue-500 bg-white">
+                      {['Sin categoría', 'General', 'Renta', 'Gestión', 'Nómina', 'Servicios', 'Mantenimiento', 'Alimentos', 'Marketing', 'Préstamos', 'Mobiliario o Equipo', 'Transporte'].map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5">Método</label>
+                    <select value={resultado.metodo} onChange={e => setResultado({...resultado, metodo: e.target.value})} className="w-full border border-gray-200 rounded-xl px-3 py-3 outline-none focus:border-blue-500 bg-white">
+                      {['Efectivo', 'Tarjeta', 'Transferencia', 'Otro'].map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                </div>
+                
+                {error && <p className="text-rose-500 text-sm font-bold bg-rose-50 p-3 rounded-xl">{error}</p>}
+              </div>
+
+              <div className="pt-4 mt-4 border-t border-gray-100 flex gap-3">
+                <button onClick={() => setResultado(null)} className="px-5 py-3.5 border border-gray-200 hover:bg-gray-50 rounded-xl font-bold text-gray-700">Reescanear</button>
+                <button onClick={handleSave} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-xl shadow-lg flex items-center justify-center gap-2">
+                  <Check className="w-5 h-5" /> Guardar registro
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ============ PANEL: NUEVA TRANSACCIÓN ============
 function NuevaTransaccion({ onClose, onGuardar, inicial }) {
   const editando = !!inicial;
@@ -1407,6 +1616,7 @@ function ViewMesas({ ajustes, ordenes, onAbrirLibre, onEditarCuenta, onCobrar, o
 // ============ VISTA: FINANZAS ============
 function ViewFinanzas({ movimientos, onNueva, onEditarMov, onEliminarMov, ventas = [], products = [], ajustes = {} }) {
   const [showNueva, setShowNueva] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
   const [editando, setEditando] = useState(null);
   const [periodo, setPeriodo] = useState('30D');
 
@@ -1514,6 +1724,9 @@ function ViewFinanzas({ movimientos, onNueva, onEditarMov, onEliminarMov, ventas
           <button onClick={exportarExcel} className="border border-emerald-200 text-emerald-700 hover:bg-emerald-50 font-bold px-5 py-3 rounded-full flex items-center gap-2 text-sm">
             <Download className="w-4 h-4" /> Exportar a Excel
           </button>
+          <button onClick={() => setShowScanner(true)} className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-6 py-3 rounded-full shadow-lg shadow-purple-600/25 flex items-center gap-2 text-sm mr-2">
+            Escanear <Camera className="w-4 h-4" />
+          </button>
           <button onClick={() => setShowNueva(true)} className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-full shadow-lg shadow-blue-600/25 flex items-center gap-2 text-sm">
             Transacción <Plus className="w-4 h-4" />
           </button>
@@ -1561,6 +1774,7 @@ function ViewFinanzas({ movimientos, onNueva, onEditarMov, onEliminarMov, ventas
           ))}
         </div>
       </div>
+      {showScanner && <ScannerModal onClose={() => setShowScanner(false)} onGuardar={t => { onNueva(t); setShowScanner(false); }} apiKey={ajustes.geminiApiKey} />}
       {showNueva && <NuevaTransaccion onClose={() => setShowNueva(false)} onGuardar={t => { onNueva(t); setShowNueva(false); }} />}
       {editando && <NuevaTransaccion inicial={editando} onClose={() => setEditando(null)} onGuardar={t => { onEditarMov(t); setEditando(null); }} />}
     </div>
@@ -1843,7 +2057,7 @@ function ViewAjustes({ ajustes, onGuardar, initialTab }) {
     <div className="p-4 md:p-8 max-w-6xl mx-auto w-full">
       <h1 className="text-3xl font-black text-gray-900 mb-6">Configuraciones</h1>
       <div className="flex items-center gap-2 mb-6">
-        {['General', 'Mesas', 'Impresoras', 'Ticket'].map(t => (
+        {['General', 'Mesas', 'Impresoras', 'Ticket', 'IA'].map(t => (
           <button key={t} onClick={() => setTab(t)}
             className={`px-5 py-2.5 rounded-full font-bold text-sm transition-colors ${tab === t ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/25' : 'text-gray-700 hover:bg-white'}`}>{t}</button>
         ))}
@@ -2078,6 +2292,16 @@ function ViewAjustes({ ajustes, onGuardar, initialTab }) {
               <p className="text-center text-xs font-bold mt-3" style={{ color: d.colorTicket }}>{d.pie || 'Gracias por su compra'}</p>
             </div>
           </div>
+        </div>
+      )}
+
+      {tab === 'IA' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+          <Card title="Inteligencia Artificial (Google Gemini)">
+            <p className="text-sm text-gray-600 mb-4">Ingresa tu clave de API gratuita de Google Gemini para habilitar el escaneo inteligente de recibos y facturas en la sección de Finanzas.</p>
+            <AjInput d={d} set={set} label="Gemini API Key" k="geminiApiKey" placeholder="AIzaSyB..." />
+            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-blue-600 font-bold text-sm hover:underline mt-2 inline-block">Obtener mi API Key gratuita</a>
+          </Card>
         </div>
       )}
 
