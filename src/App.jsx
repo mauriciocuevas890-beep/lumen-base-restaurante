@@ -51,6 +51,7 @@ const AJUSTES_DEFAULT = {
   areasVenta: ['Barra', 'Sin área de venta', 'Cocina'],
   // IA
   geminiApiKey: '',
+  geminiModelo: 'gemini-3.0-flash',
 };
 
 // ============ FUNCIONES DE FECHA Y FILTROS ============
@@ -1263,7 +1264,7 @@ function ViewProductos({ products, onNuevo, onEditar, onEliminar, onToggleFav, o
 }
 
 // ============ MODAL: ESCANER IA ============
-function ScannerModal({ onClose, onGuardar, apiKey }) {
+function ScannerModal({ onClose, onGuardar, apiKey, modelo = 'gemini-3.0-flash' }) {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -1305,7 +1306,7 @@ function ScannerModal({ onClose, onGuardar, apiKey }) {
         "folio": "Numero de ticket o factura si aplica (o vacio)"
       }`;
 
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelo.trim()}:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1780,7 +1781,7 @@ function ViewFinanzas({ movimientos, onNueva, onEditarMov, onEliminarMov, ventas
           ))}
         </div>
       </div>
-      {showScanner && <ScannerModal onClose={() => setShowScanner(false)} onGuardar={t => { onNueva(t); setShowScanner(false); }} apiKey={ajustes.geminiApiKey} />}
+      {showScanner && <ScannerModal onClose={() => setShowScanner(false)} onGuardar={t => { onNueva(t); setShowScanner(false); }} apiKey={ajustes.geminiApiKey} modelo={ajustes.geminiModelo} />}
       {showNueva && <NuevaTransaccion onClose={() => setShowNueva(false)} onGuardar={t => { onNueva(t); setShowNueva(false); }} />}
       {editando && <NuevaTransaccion inicial={editando} onClose={() => setEditando(null)} onGuardar={t => { onEditarMov(t); setEditando(null); }} />}
     </div>
@@ -2306,7 +2307,9 @@ function ViewAjustes({ ajustes, onGuardar, initialTab }) {
           <Card title="Inteligencia Artificial (Google Gemini)">
             <p className="text-sm text-gray-600 mb-4">Ingresa tu clave de API gratuita de Google Gemini para habilitar el escaneo inteligente de recibos y facturas en la sección de Finanzas.</p>
             <AjInput d={d} set={set} label="Gemini API Key" k="geminiApiKey" placeholder="AIzaSyB..." />
-            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-blue-600 font-bold text-sm hover:underline mt-2 inline-block">Obtener mi API Key gratuita</a>
+            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-blue-600 font-bold text-sm hover:underline mt-2 mb-6 inline-block">Obtener mi API Key gratuita</a>
+            <AjInput d={d} set={set} label="Modelo de IA (Avanzado)" k="geminiModelo" placeholder="gemini-3.0-flash" />
+            <p className="text-xs text-gray-500 mt-1">Si obtienes un error de modelo no encontrado, puedes cambiar la versión aquí (ej: gemini-1.5-pro, gemini-3.0-flash).</p>
           </Card>
         </div>
       )}
