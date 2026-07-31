@@ -1264,7 +1264,15 @@ function ViewProductos({ products, onNuevo, onEditar, onEliminar, onToggleFav, o
 }
 
 // ============ MODAL: ESCANER IA ============
-function ScannerModal({ onClose, onGuardar, apiKey, modelo = 'gpt-4o-mini' }) {
+function ScannerModal({ onClose, onGuardar, apiKey, modelo = 'gpt-4o-mini', products = [] }) {
+  // Busca el producto más parecido en el catálogo (ignora mayúsculas/tildes)
+  const buscarPrecioEnCatalogo = (nombre) => {
+    if (!nombre || products.length === 0) return '';
+    const normalizar = s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    const buscado = normalizar(nombre);
+    const encontrado = products.find(p => normalizar(p.nombre).includes(buscado) || buscado.includes(normalizar(p.nombre)));
+    return encontrado ? String(encontrado.precio) : '';
+  };
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -1272,6 +1280,7 @@ function ScannerModal({ onClose, onGuardar, apiKey, modelo = 'gpt-4o-mini' }) {
   const [resultado, setResultado] = useState(null);
   // platillos: [{nombre, cantidad, precio}]
   const [platillos, setPlatillos] = useState([]);
+  const [fecha, setFecha] = useState(() => new Date().toISOString().split('T')[0]);
   const fileInputRef = useRef(null);
 
   const handleFileChange = (e) => {
@@ -1358,13 +1367,22 @@ IMPORTANTE: Extrae TODOS los platillos o productos que veas escritos. Si un plat
       const cleanTexto = textoRespuesta.replace(/```json/gi, '').replace(/```/g, '').trim();
       const jsonParsed = JSON.parse(cleanTexto);
 
-      const lista = (jsonParsed.platillos || []).map(p => ({
-        nombre: p.nombre || '',
-        cantidad: String(p.cantidad || 1),
-        precio: p.precio != null ? String(p.precio) : ''
-      }));
+      const lista = (jsonParsed.platillos || []).map(p => {
+        // Si la IA no dio precio, intentar buscarlo en el catálogo de productos
+        let precio = p.precio != null ? String(p.precio) : '';
+        if (!precio) precio = buscarPrecioEnCatalogo(p.nombre || '');
+        return {
+          nombre: p.nombre || '',
+          cantidad: String(p.cantidad || 1),
+          precio,
+          desdeCatalogo: !p.precio && !!precio, // indica que el precio vino del catálogo
+        };
+      });
 
-      const total = lista.reduce((sum, p) => sum + (parseFloat(p.precio) || 0), 0);
+      const total = lista.reduce((sum, p) => sum + (parseFloat(p.precio) || 0) * (parseFloat(p.cantidad) || 1), 0);
+
+      // Extraer fecha del documento si la IA la detectó
+      if (jsonParsed.fecha) setFecha(jsonParsed.fecha);
 
       setPlatillos(lista);
       setResultado({
@@ -1398,6 +1416,7 @@ IMPORTANTE: Extrae TODOS los platillos o productos que veas escritos. Si un plat
       .join(', ');
     const montoFinal = parseFloat(resultado.monto) || 0;
     onGuardar({
+      fecha,
       ...resultado,
       descripcion,
       id: `mov-${Date.now()}`,
@@ -1485,10 +1504,13 @@ IMPORTANTE: Extrae TODOS los platillos o productos que veas escritos. Si un plat
                     <input
                       type="text" value={p.nombre} placeholder="Nombre del platillo"
                       onChange={e => updatePlatillo(i, 'nombre', e.target.value)}
-                      className="col-span-7 outline-none bg-transparent font-medium text-gray-900 text-sm w-full"
+                      className="col-span-6 outline-none bg-transparent font-medium text-gray-900 text-sm w-full"
                     />
-                    <div className="col-span-3 flex items-center">
-                      <span className="text-gray-400 text-sm mr-1">$</span>
+                    <div className="col-span-4 flex items-center gap-1">
+                      {p.desdeCatalogo && (
+                        <span title="Precio del catálogo" className="text-xs font-bold text-blue-500 shrink-0">📋</span>
+                      )}
+                      <span className="text-gray-400 text-sm">$</span>
                       <input
                         type="number" min="0" step="0.01" value={p.precio} placeholder="—"
                         onChange={e => updatePlatillo(i, 'precio', e.target.value)}
@@ -1508,6 +1530,14 @@ IMPORTANTE: Extrae TODOS los platillos o productos que veas escritos. Si un plat
 
               {/* Monto total, método y categoría */}
               <div className="border-t border-gray-100 pt-4 space-y-3">
+
+                {/* Fecha de la comanda */}
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-bold text-gray-500">Fecha</label>
+                  <input type="date" value={fecha} onChange={e => setFecha(e.target.value)}
+                    className="border border-gray-200 rounded-xl px-3 py-2 text-sm font-medium outline-none focus:border-blue-500 text-gray-900" />
+                </div>
+
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-bold text-gray-500">Total</span>
                   <div className="flex items-center border border-gray-200 rounded-xl px-3 py-2 focus-within:border-blue-500 w-36">
@@ -1859,7 +1889,7 @@ function ViewFinanzas({ movimientos, onNueva, onEditarMov, onEliminarMov, ventas
           ))}
         </div>
       </div>
-      {showScanner && <ScannerModal onClose={() => setShowScanner(false)} onGuardar={t => { onNueva(t); setShowScanner(false); }} apiKey={ajustes.openaiApiKey} modelo={ajustes.openaiModelo} />}
+      {showScanner && <ScannerModal onClose={() => setShowScanner(false)} onGuardar={t => { onNueva(t); setShowScanner(false); }} apiKey={ajustes.openaiApiKey} modelo={ajustes.openaiModelo} products={products} />}
       {showNueva && <NuevaTransaccion onClose={() => setShowNueva(false)} onGuardar={t => { onNueva(t); setShowNueva(false); }} />}
       {editando && <NuevaTransaccion inicial={editando} onClose={() => setEditando(null)} onGuardar={t => { onEditarMov(t); setEditando(null); }} />}
     </div>
