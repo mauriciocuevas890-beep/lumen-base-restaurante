@@ -1296,14 +1296,14 @@ function ScannerModal({ onClose, onGuardar, apiKey, modelo = 'gemini-3.0-flash' 
       const base64Data = preview.split(',')[1];
       const mimeType = file.type;
 
-      const prompt = `Analiza este recibo o factura y extrae la siguiente información en formato JSON estricto:
+      const prompt = `Analiza esta nota de consumo o pedido a mano y extrae la siguiente información en formato JSON estricto:
       {
-        "tipo": "Gasto" o "Ingreso" (si es un ticket de compra es Gasto, si es un ticket de venta tuya es Ingreso),
-        "monto": numero (solo el total numérico),
-        "categoria": "General", "Renta", "Servicios", "Alimentos", "Transporte", "Mantenimiento" o "Sin categoría",
-        "descripcion": "Nombre del proveedor o descripción breve",
+        "tipo": "Ingreso",
+        "monto": numero (intenta calcular la suma matemática de los precios si no hay un total escrito explícitamente),
+        "categoria": "Ventas",
+        "descripcion": "Extrae detalladamente TODOS los platillos leídos con su cantidad y precio si lo tienen. Usa este formato: '2x Tacos al pastor ($30), 1x Coca Cola ($20). Notas: Sin cebolla'. Si algún platillo no tiene precio escrito, solo pon el nombre y cantidad.",
         "fecha": "YYYY-MM-DD" (o déjalo vacío si no la encuentras),
-        "folio": "Numero de ticket o factura si aplica (o vacio)"
+        "folio": "Numero de ticket o comanda si aplica (o vacio)"
       }`;
 
       const res = await fetch(`https://api.openai.com/v1/chat/completions`, {
@@ -1340,9 +1340,9 @@ function ScannerModal({ onClose, onGuardar, apiKey, modelo = 'gemini-3.0-flash' 
       const jsonParsed = JSON.parse(cleanTexto);
       
       setResultado({
-        tipo: jsonParsed.tipo || 'Gasto',
+        tipo: jsonParsed.tipo || 'Ingreso',
         monto: String(jsonParsed.monto || ''),
-        categoria: jsonParsed.categoria || 'Sin categoría',
+        categoria: jsonParsed.categoria || 'Ventas',
         descripcion: jsonParsed.descripcion || '',
         folio: jsonParsed.folio || '',
         metodo: 'Efectivo', // Default
@@ -1453,7 +1453,7 @@ function ScannerModal({ onClose, onGuardar, apiKey, modelo = 'gemini-3.0-flash' 
 
                 <div>
                   <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1.5">Descripción</label>
-                  <input value={resultado.descripcion} onChange={e => setResultado({...resultado, descripcion: e.target.value})} className="w-full border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500 font-medium" />
+                  <textarea rows="4" value={resultado.descripcion} onChange={e => setResultado({...resultado, descripcion: e.target.value})} className="w-full border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500 font-medium resize-none" />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
