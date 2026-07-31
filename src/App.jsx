@@ -1323,7 +1323,9 @@ function ScannerModal({ onClose, onGuardar, apiKey }) {
       if (data.error) throw new Error(data.error.message);
       
       const textoRespuesta = data.candidates[0].content.parts[0].text;
-      const jsonParsed = JSON.parse(textoRespuesta);
+      const cleanTexto = textoRespuesta.replace(/```json/gi, '').replace(/```/g, '').trim();
+      const jsonParsed = JSON.parse(cleanTexto);
+      
       setResultado({
         tipo: jsonParsed.tipo || 'Gasto',
         monto: String(jsonParsed.monto || ''),
@@ -1334,7 +1336,11 @@ function ScannerModal({ onClose, onGuardar, apiKey }) {
         pagado: true,
       });
     } catch (err) {
-      setError('Error al analizar la imagen. Intenta con otra imagen más clara o revisa tu API Key.');
+      if (err.message.includes('API_KEY_INVALID') || err.message.includes('API key not valid')) {
+        setError('Tu API Key no es válida. Revisa que la hayas copiado bien en Ajustes.');
+      } else {
+        setError('Error al analizar la imagen. Detalle: ' + err.message);
+      }
       console.error(err);
     } finally {
       setLoading(false);
