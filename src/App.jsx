@@ -1265,14 +1265,6 @@ function ViewProductos({ products, onNuevo, onEditar, onEliminar, onToggleFav, o
 
 // ============ MODAL: ESCANER IA ============
 function ScannerModal({ onClose, onGuardar, apiKey, modelo = 'gpt-4o-mini', products = [] }) {
-  // Busca el producto más parecido en el catálogo (ignora mayúsculas/tildes)
-  const buscarPrecioEnCatalogo = (nombre) => {
-    if (!nombre || products.length === 0) return '';
-    const normalizar = s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
-    const buscado = normalizar(nombre);
-    const encontrado = products.find(p => normalizar(p.nombre).includes(buscado) || buscado.includes(normalizar(p.nombre)));
-    return encontrado ? String(encontrado.precio) : '';
-  };
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -1280,7 +1272,6 @@ function ScannerModal({ onClose, onGuardar, apiKey, modelo = 'gpt-4o-mini', prod
   const [resultado, setResultado] = useState(null);
   // platillos: [{nombre, cantidad, precio}]
   const [platillos, setPlatillos] = useState([]);
-  const [fecha, setFecha] = useState(() => new Date().toISOString().split('T')[0]);
   const fileInputRef = useRef(null);
 
   const handleFileChange = (e) => {
@@ -1325,6 +1316,8 @@ function ScannerModal({ onClose, onGuardar, apiKey, modelo = 'gpt-4o-mini', prod
     try {
       const base64Data = preview.split(',')[1];
       const mimeType = file.type;
+      
+      const menuTexto = products.map(p => `- ${p.nombre} ($${p.precio})`).join('\n');
 
       const prompt = `Analiza esta nota de pedido, comanda o recibo a mano y responde ÚNICAMENTE con un JSON válido con esta estructura exacta:
 {
@@ -1337,7 +1330,14 @@ function ScannerModal({ onClose, onGuardar, apiKey, modelo = 'gpt-4o-mini', prod
     { "nombre": "Nombre del platillo o producto", "cantidad": número entero, "precio": número o null si no tiene precio }
   ]
 }
-IMPORTANTE: Extrae TODOS los platillos o productos que veas escritos. Si un platillo no tiene precio escrito, pon null en precio. No incluyas ningún texto fuera del JSON.`;
+IMPORTANTE: Extrae TODOS los platillos o productos que veas escritos en la nota. 
+Aquí está la base de datos de mis productos:
+${menuTexto}
+
+REGLAS DE RELACIÓN:
+1. Si un platillo de la nota se parece o es el mismo que uno de mi base de datos, pon el nombre EXACTO de mi base de datos y pon SU PRECIO de mi base de datos (ignora el precio de la nota si lo tiene).
+2. Si un platillo NO aparece en mi base de datos, extrae su nombre tal cual viene en la nota y deja su precio en null (en blanco).
+No incluyas ningún texto fuera del JSON.`;
 
       const res = await fetch(`https://api.openai.com/v1/chat/completions`, {
         method: 'POST',
@@ -1367,28 +1367,21 @@ IMPORTANTE: Extrae TODOS los platillos o productos que veas escritos. Si un plat
       const cleanTexto = textoRespuesta.replace(/```json/gi, '').replace(/```/g, '').trim();
       const jsonParsed = JSON.parse(cleanTexto);
 
-      const lista = (jsonParsed.platillos || []).map(p => {
-        // Si la IA no dio precio, intentar buscarlo en el catálogo de productos
-        let precio = p.precio != null ? String(p.precio) : '';
-        if (!precio) precio = buscarPrecioEnCatalogo(p.nombre || '');
-        return {
-          nombre: p.nombre || '',
-          cantidad: String(p.cantidad || 1),
-          precio,
-          desdeCatalogo: !p.precio && !!precio, // indica que el precio vino del catálogo
-        };
-      });
+      const lista = (jsonParsed.platillos || []).map(p => ({
+        nombre: p.nombre || '',
+        cantidad: String(p.cantidad || 1),
+        precio: p.precio != null ? String(p.precio) : ''
+      }));
 
-      const total = lista.reduce((sum, p) => sum + (parseFloat(p.precio) || 0) * (parseFloat(p.cantidad) || 1), 0);
-
-      // Extraer fecha del documento si la IA la detectó
-      if (jsonParsed.fecha) setFecha(jsonParsed.fecha);
+      const total = lista.reduce((sum, p) => sum + (parseFloat(p.precio) || 0), 0);
 
       setPlatillos(lista);
+      const today = new Date().toISOString().split('T')[0];
       setResultado({
         tipo: 'Ingreso',
         monto: total > 0 ? String(total) : '',
         categoria: 'Ventas',
+        fecha: jsonParsed.fecha || today,
         folio: jsonParsed.folio || '',
         metodo: jsonParsed.metodo || 'Efectivo',
         pagado: true,
@@ -1415,13 +1408,22 @@ IMPORTANTE: Extrae TODOS los platillos o productos que veas escritos. Si un plat
       .map(p => `${p.cantidad}x ${p.nombre}${p.precio ? ` ($${p.precio})` : ''}`)
       .join(', ');
     const montoFinal = parseFloat(resultado.monto) || 0;
+    
+    // Convertir la fecha YYYY-MM-DD seleccionada a un Timestamp para que se ordene correctamente en la lista de Finanzas
+    let ts = Date.now();
+    if (resultado.fecha) {
+      const [y, m, d] = resultado.fecha.split('-');
+      if (y && m && d) {
+        ts = new Date(y, m - 1, d, 12, 0, 0).getTime();
+      }
+    }
+
     onGuardar({
-      fecha,
       ...resultado,
       descripcion,
       id: `mov-${Date.now()}`,
       monto: montoFinal,
-      ts: Date.now()
+      ts: ts
     });
   };
 
@@ -1504,13 +1506,10 @@ IMPORTANTE: Extrae TODOS los platillos o productos que veas escritos. Si un plat
                     <input
                       type="text" value={p.nombre} placeholder="Nombre del platillo"
                       onChange={e => updatePlatillo(i, 'nombre', e.target.value)}
-                      className="col-span-6 outline-none bg-transparent font-medium text-gray-900 text-sm w-full"
+                      className="col-span-7 outline-none bg-transparent font-medium text-gray-900 text-sm w-full"
                     />
-                    <div className="col-span-4 flex items-center gap-1">
-                      {p.desdeCatalogo && (
-                        <span title="Precio del catálogo" className="text-xs font-bold text-blue-500 shrink-0">📋</span>
-                      )}
-                      <span className="text-gray-400 text-sm">$</span>
+                    <div className="col-span-3 flex items-center">
+                      <span className="text-gray-400 text-sm mr-1">$</span>
                       <input
                         type="number" min="0" step="0.01" value={p.precio} placeholder="—"
                         onChange={e => updatePlatillo(i, 'precio', e.target.value)}
@@ -1530,14 +1529,6 @@ IMPORTANTE: Extrae TODOS los platillos o productos que veas escritos. Si un plat
 
               {/* Monto total, método y categoría */}
               <div className="border-t border-gray-100 pt-4 space-y-3">
-
-                {/* Fecha de la comanda */}
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-bold text-gray-500">Fecha</label>
-                  <input type="date" value={fecha} onChange={e => setFecha(e.target.value)}
-                    className="border border-gray-200 rounded-xl px-3 py-2 text-sm font-medium outline-none focus:border-blue-500 text-gray-900" />
-                </div>
-
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-bold text-gray-500">Total</span>
                   <div className="flex items-center border border-gray-200 rounded-xl px-3 py-2 focus-within:border-blue-500 w-36">
@@ -1545,6 +1536,15 @@ IMPORTANTE: Extrae TODOS los platillos o productos que veas escritos. Si un plat
                     <input type="number" step="0.01" value={resultado.monto}
                       onChange={e => setResultado({...resultado, monto: e.target.value})}
                       className="outline-none w-full font-bold text-gray-900 text-right" />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold text-gray-500">Fecha</span>
+                  <div className="flex items-center border border-gray-200 rounded-xl px-3 py-2 focus-within:border-blue-500 w-36 bg-white">
+                    <input type="date" value={resultado.fecha}
+                      onChange={e => setResultado({...resultado, fecha: e.target.value})}
+                      className="outline-none w-full font-bold text-gray-900 text-sm" />
                   </div>
                 </div>
 
