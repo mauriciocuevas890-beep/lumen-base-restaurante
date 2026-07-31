@@ -50,8 +50,8 @@ const AJUSTES_DEFAULT = {
   impresoras: [{ id: 'imp1', nombre: 'Impresora de Tickets', estado: 'Sin configurar' }],
   areasVenta: ['Barra', 'Sin área de venta', 'Cocina'],
   // IA
-  geminiApiKey: '',
-  geminiModelo: 'gemini-3.0-flash',
+  openaiApiKey: '',
+  openaiModelo: 'gpt-4o-mini',
 };
 
 // ============ FUNCIONES DE FECHA Y FILTROS ============
@@ -1284,10 +1284,10 @@ function ScannerModal({ onClose, onGuardar, apiKey, modelo = 'gemini-3.0-flash' 
     }
   };
 
-  const analizarConGemini = async () => {
+  const analizarConOpenAI = async () => {
     if (!file) return;
     if (!apiKey) {
-      setError('Por favor configura tu API Key de Gemini en la pestaña Ajustes > IA.');
+      setError('Por favor configura tu API Key de OpenAI en la pestaña Ajustes > IA.');
       return;
     }
     setLoading(true);
@@ -1306,24 +1306,36 @@ function ScannerModal({ onClose, onGuardar, apiKey, modelo = 'gemini-3.0-flash' 
         "folio": "Numero de ticket o factura si aplica (o vacio)"
       }`;
 
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelo.trim()}:generateContent?key=${apiKey}`, {
+      const res = await fetch(`https://api.openai.com/v1/chat/completions`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
         body: JSON.stringify({
-          contents: [{
-            parts: [
-              { text: prompt },
-              { inline_data: { mime_type: mimeType, data: base64Data } }
-            ]
-          }],
-          generationConfig: { response_mime_type: "application/json" }
+          model: modelo.trim(),
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "text", text: prompt },
+                {
+                  type: "image_url",
+                  image_url: {
+                    url: `data:${mimeType};base64,${base64Data}`
+                  }
+                }
+              ]
+            }
+          ],
+          response_format: { type: "json_object" }
         })
       });
       
       const data = await res.json();
       if (data.error) throw new Error(data.error.message);
       
-      const textoRespuesta = data.candidates[0].content.parts[0].text;
+      const textoRespuesta = data.choices[0].message.content;
       const cleanTexto = textoRespuesta.replace(/```json/gi, '').replace(/```/g, '').trim();
       const jsonParsed = JSON.parse(cleanTexto);
       
@@ -1399,7 +1411,7 @@ function ScannerModal({ onClose, onGuardar, apiKey, modelo = 'gemini-3.0-flash' 
           <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
           
           {preview && !resultado && !loading && (
-            <button onClick={analizarConGemini} className="mt-4 w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3.5 rounded-xl shadow-lg flex items-center justify-center gap-2">
+            <button onClick={analizarConOpenAI} className="mt-4 w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3.5 rounded-xl shadow-lg flex items-center justify-center gap-2">
               <Star className="w-5 h-5" /> Extraer datos automáticamente
             </button>
           )}
@@ -1781,7 +1793,7 @@ function ViewFinanzas({ movimientos, onNueva, onEditarMov, onEliminarMov, ventas
           ))}
         </div>
       </div>
-      {showScanner && <ScannerModal onClose={() => setShowScanner(false)} onGuardar={t => { onNueva(t); setShowScanner(false); }} apiKey={ajustes.geminiApiKey} modelo={ajustes.geminiModelo} />}
+      {showScanner && <ScannerModal onClose={() => setShowScanner(false)} onGuardar={t => { onNueva(t); setShowScanner(false); }} apiKey={ajustes.openaiApiKey} modelo={ajustes.openaiModelo} />}
       {showNueva && <NuevaTransaccion onClose={() => setShowNueva(false)} onGuardar={t => { onNueva(t); setShowNueva(false); }} />}
       {editando && <NuevaTransaccion inicial={editando} onClose={() => setEditando(null)} onGuardar={t => { onEditarMov(t); setEditando(null); }} />}
     </div>
@@ -2049,30 +2061,34 @@ const AjInput = ({ d, set, label, k, placeholder, req }) => (
   </div>
 );
 
-function GeminiModelSelector({ d, set }) {
+function OpenAIModelSelector({ d, set }) {
   const [modelos, setModelos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const cargarModelos = async () => {
-    if (!d.geminiApiKey) {
+    if (!d.openaiApiKey) {
       setError('Primero ingresa tu API Key arriba');
       return;
     }
     setLoading(true); setError(null);
     try {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${d.geminiApiKey}`);
+      const res = await fetch(`https://api.openai.com/v1/models`, {
+        headers: { 'Authorization': `Bearer ${d.openaiApiKey}` }
+      });
       const data = await res.json();
       if (data.error) throw new Error(data.error.message);
-      const validos = (data.models || [])
-        .filter(m => m.supportedGenerationMethods?.includes('generateContent'))
-        .map(m => m.name.replace('models/', ''));
+      
+      const validos = (data.data || [])
+        .map(m => m.id)
+        .filter(id => id.includes('gpt-4o') || id.includes('gpt-4-turbo'));
+      
       setModelos(validos);
-      if (validos.length > 0 && !validos.includes(d.geminiModelo)) {
-        set('geminiModelo', validos[0]);
+      if (validos.length > 0 && !validos.includes(d.openaiModelo)) {
+        set('openaiModelo', validos[0]);
       }
     } catch(err) {
-      if (err.message.includes('API_KEY_INVALID')) setError('API Key no válida.');
+      if (err.message.includes('Incorrect API key')) setError('API Key no válida.');
       else setError(err.message);
     } finally {
       setLoading(false);
@@ -2089,15 +2105,15 @@ function GeminiModelSelector({ d, set }) {
       </div>
       
       {modelos.length > 0 ? (
-        <select value={d.geminiModelo} onChange={e => set('geminiModelo', e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-3 outline-none focus:border-blue-500 bg-white">
+        <select value={d.openaiModelo} onChange={e => set('openaiModelo', e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-3 outline-none focus:border-blue-500 bg-white">
           {modelos.map(m => <option key={m} value={m}>{m}</option>)}
         </select>
       ) : (
-        <input value={d.geminiModelo} onChange={e => set('geminiModelo', e.target.value)} placeholder="gemini-1.5-pro" className="w-full border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500 font-medium" />
+        <input value={d.openaiModelo} onChange={e => set('openaiModelo', e.target.value)} placeholder="gpt-4o-mini" className="w-full border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500 font-medium" />
       )}
       
       {error && <p className="text-rose-500 text-xs font-bold mt-2">{error}</p>}
-      <p className="text-xs text-gray-500 mt-2">Si el modelo por defecto marca error, haz clic en "Cargar modelos" para ver los que tu API Key tiene permitidos.</p>
+      <p className="text-xs text-gray-500 mt-2">Haz clic en "Cargar modelos" para ver los modelos de visión disponibles en tu cuenta de OpenAI.</p>
     </div>
   );
 }
@@ -2357,11 +2373,11 @@ function ViewAjustes({ ajustes, onGuardar, initialTab }) {
 
       {tab === 'IA' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
-          <Card title="Inteligencia Artificial (Google Gemini)">
-            <p className="text-sm text-gray-600 mb-4">Ingresa tu clave de API gratuita de Google Gemini para habilitar el escaneo inteligente de recibos y facturas en la sección de Finanzas.</p>
-            <AjInput d={d} set={set} label="Gemini API Key" k="geminiApiKey" placeholder="AIzaSyB..." />
-            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-blue-600 font-bold text-sm hover:underline mt-2 mb-6 inline-block">Obtener mi API Key gratuita</a>
-            <GeminiModelSelector d={d} set={set} />
+          <Card title="Inteligencia Artificial (OpenAI ChatGPT)">
+            <p className="text-sm text-gray-600 mb-4">Ingresa tu clave de API de OpenAI para habilitar el escaneo inteligente de recibos y facturas con ChatGPT en la sección de Finanzas.</p>
+            <AjInput d={d} set={set} label="OpenAI API Key" k="openaiApiKey" placeholder="sk-proj-..." />
+            <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer" className="text-blue-600 font-bold text-sm hover:underline mt-2 mb-6 inline-block">Obtener mi API Key de OpenAI</a>
+            <OpenAIModelSelector d={d} set={set} />
           </Card>
         </div>
       )}
