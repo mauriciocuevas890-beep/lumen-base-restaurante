@@ -166,7 +166,7 @@ function ProductTile({ product, onClick, sinStockOk }) {
 }
 
 // ============ PANEL: CLIENTES (buscar / crear, estilo Yimi) ============
-function ClientesPanel({ clientes, onClose, onSelect, onCrear }) {
+function ClientesPanel({ clientes, onClose, onSelect, onCrear, onEliminar }) {
   const [modo, setModo] = useState('lista');
   const [busqueda, setBusqueda] = useState('');
   const [f, setF] = useState({ nombre: '', telefono: '', email: '', domicilio: '', detalles: '' });
@@ -196,14 +196,20 @@ function ClientesPanel({ clientes, onClose, onSelect, onCrear }) {
                 <button onClick={() => setModo('nuevo')} className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-8 py-3 rounded-full shadow-lg shadow-blue-600/25">Nuevo cliente</button>
               </div>
             ) : filtrados.map(c => (
-              <button key={c.id} onClick={() => onSelect(c)}
-                className="flex items-center gap-3 py-3 px-2 hover:bg-gray-50 rounded-2xl text-left border-b border-gray-50">
-                <div className="w-11 h-11 rounded-full bg-gray-800 text-white flex items-center justify-center font-bold shrink-0">{c.nombre.slice(0, 2).toUpperCase()}</div>
-                <div className="min-w-0">
-                  <p className="font-bold text-gray-900">{c.nombre}</p>
-                  <p className="text-xs text-gray-500 truncate">{c.telefono}{c.domicilio ? ` · ${c.domicilio}` : ''}</p>
-                </div>
-              </button>
+              <div key={c.id} className="flex items-center gap-2 py-3 px-2 hover:bg-gray-50 rounded-2xl border-b border-gray-50 group">
+                <button onClick={() => onSelect(c)} className="flex-1 flex items-center gap-3 text-left min-w-0">
+                  <div className="w-11 h-11 rounded-full bg-gray-800 text-white flex items-center justify-center font-bold shrink-0">{c.nombre.slice(0, 2).toUpperCase()}</div>
+                  <div className="min-w-0">
+                    <p className="font-bold text-gray-900">{c.nombre}</p>
+                    <p className="text-xs text-gray-500 truncate">{c.telefono}{c.domicilio ? ` · ${c.domicilio}` : ''}</p>
+                  </div>
+                </button>
+                {onEliminar && (
+                  <button onClick={() => { if (confirm(`¿Eliminar al cliente ${c.nombre}?`)) onEliminar(c.id); }} className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-full opacity-0 group-hover:opacity-100 transition-all focus:opacity-100 shrink-0">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
             ))}
             {filtrados.length > 0 && <button onClick={() => onSelect(null)} className="mt-3 text-blue-600 font-bold text-sm py-2 hover:bg-blue-50 rounded-full">Vender sin cliente</button>}
           </>
@@ -3141,7 +3147,8 @@ function PosApp({ negocioId, negocioNombre, sesion, negocios, rol, onCambiarNego
         <ClientesPanel clientes={clientes}
           onClose={() => setShowClientes(false)}
           onSelect={c => { setCliente(c); setShowClientes(false); }}
-          onCrear={c => { setClientes(prev => [c, ...prev]); setCliente(c); setShowClientes(false); }} />
+          onCrear={c => { setClientes(prev => [c, ...prev]); setCliente(c); setShowClientes(false); }}
+          onEliminar={id => setClientes(prev => prev.filter(c => c.id !== id))} />
       )}
       {showProgramar && (
         <ProgramarPedidoModal entrega={entrega} cliente={cliente}
