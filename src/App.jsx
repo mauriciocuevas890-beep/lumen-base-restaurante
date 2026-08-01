@@ -603,13 +603,13 @@ function TicketPanel({ venta, ajustes, onClose, onPersonalizar }) {
     alert('Tu dispositivo no permite compartir directamente; descargué la imagen del ticket para que la envíes.');
   };
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/30" onClick={onClose}>
-      <div className="bg-white w-full max-w-lg h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-200" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between p-5 border-b border-gray-100">
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/30 print:static print:bg-white print:inset-auto" onClick={onClose}>
+      <div className="bg-white w-full max-w-lg h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-200 print:shadow-none print:w-full print:max-w-none print:h-auto print:block" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-5 border-b border-gray-100 print:hidden">
           <h2 className="text-xl font-bold text-gray-900">Comprobante</h2>
           <button onClick={onClose} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200"><X className="w-5 h-5 text-gray-600" /></button>
         </div>
-        <div className="flex items-center justify-between px-5 py-3">
+        <div className="flex items-center justify-between px-5 py-3 print:hidden">
           <div className="bg-gray-100 rounded-full p-1 flex">
             {['Ticket', 'Factura'].map(t => (
               <button key={t} onClick={() => setTab(t)}
@@ -621,9 +621,9 @@ function TicketPanel({ venta, ajustes, onClose, onPersonalizar }) {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5 bg-gray-50/60">
+        <div className="flex-1 overflow-y-auto p-5 bg-gray-50/60 print:bg-white print:overflow-visible print:p-0">
           {tab === 'Ticket' ? (
-            <div ref={ticketRef} className="print-area bg-white shadow-sm p-6 [clip-path:polygon(0_8px,2.5%_0,5%_8px,7.5%_0,10%_8px,12.5%_0,15%_8px,17.5%_0,20%_8px,22.5%_0,25%_8px,27.5%_0,30%_8px,32.5%_0,35%_8px,37.5%_0,40%_8px,42.5%_0,45%_8px,47.5%_0,50%_8px,52.5%_0,55%_8px,57.5%_0,60%_8px,62.5%_0,65%_8px,67.5%_0,70%_8px,72.5%_0,75%_8px,77.5%_0,80%_8px,82.5%_0,85%_8px,87.5%_0,90%_8px,92.5%_0,95%_8px,97.5%_0,100%_8px,100%_100%,0_100%)]">
+            <div ref={ticketRef} className="bg-white shadow-sm p-6 [clip-path:polygon(0_8px,2.5%_0,5%_8px,7.5%_0,10%_8px,12.5%_0,15%_8px,17.5%_0,20%_8px,22.5%_0,25%_8px,27.5%_0,30%_8px,32.5%_0,35%_8px,37.5%_0,40%_8px,42.5%_0,45%_8px,47.5%_0,50%_8px,52.5%_0,55%_8px,57.5%_0,60%_8px,62.5%_0,65%_8px,67.5%_0,70%_8px,72.5%_0,75%_8px,77.5%_0,80%_8px,82.5%_0,85%_8px,87.5%_0,90%_8px,92.5%_0,95%_8px,97.5%_0,100%_8px,100%_100%,0_100%)] print:shadow-none print:[clip-path:none]">
               <div className="flex justify-between items-start mb-1 mt-2">
                 {ajustes.logo ? (
                   <img src={ajustes.logo} alt="Logo Negocio" className="w-16 h-16 object-contain shrink-0" />
@@ -666,7 +666,7 @@ function TicketPanel({ venta, ajustes, onClose, onPersonalizar }) {
               <p className="text-center text-[11px] text-gray-400 mt-1">{fechaLarga} · {venta.fecha || fmtHora(getTimestamp(venta))} · {ajustes.nombre}</p>
             </div>
           ) : (
-            <div ref={ticketRef} className="print-area bg-white shadow-sm rounded-xl p-6">
+            <div ref={ticketRef} className="bg-white shadow-sm rounded-xl p-6 print:shadow-none print:p-0">
               <div className="flex justify-between items-start mb-5">
                 <div className="flex gap-3 items-center">
                   {ajustes.logo && <img src={ajustes.logo} alt="Logo Negocio" className="w-16 h-16 object-contain shrink-0" />}
@@ -713,7 +713,7 @@ function TicketPanel({ venta, ajustes, onClose, onPersonalizar }) {
             </div>
           )}
         </div>
-        <div className="p-4 border-t border-gray-100 grid grid-cols-3 gap-3">
+        <div className="p-4 border-t border-gray-100 grid grid-cols-3 gap-3 print:hidden">
           <button onClick={() => typeof window !== 'undefined' && window.print && window.print()} className="bg-blue-600 hover:bg-blue-700 text-white rounded-2xl py-3.5 flex flex-col items-center gap-1 font-bold text-sm"><Printer className="w-5 h-5" /> Imprimir</button>
           <button onClick={descargar} className="border border-gray-200 hover:bg-gray-50 text-gray-800 rounded-2xl py-3.5 flex flex-col items-center gap-1 font-bold text-sm"><Download className="w-5 h-5" /> Descargar</button>
           <button onClick={compartir} className="border border-gray-200 hover:bg-gray-50 text-gray-800 rounded-2xl py-3.5 flex flex-col items-center gap-1 font-bold text-sm"><Share2 className="w-5 h-5" /> Compartir</button>
