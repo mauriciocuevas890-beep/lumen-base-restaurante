@@ -623,7 +623,7 @@ function TicketPanel({ venta, ajustes, onClose, onPersonalizar }) {
 
         <div className="flex-1 overflow-y-auto p-5 bg-gray-50/60">
           {tab === 'Ticket' ? (
-            <div ref={ticketRef} className="bg-white shadow-sm p-6 [clip-path:polygon(0_8px,2.5%_0,5%_8px,7.5%_0,10%_8px,12.5%_0,15%_8px,17.5%_0,20%_8px,22.5%_0,25%_8px,27.5%_0,30%_8px,32.5%_0,35%_8px,37.5%_0,40%_8px,42.5%_0,45%_8px,47.5%_0,50%_8px,52.5%_0,55%_8px,57.5%_0,60%_8px,62.5%_0,65%_8px,67.5%_0,70%_8px,72.5%_0,75%_8px,77.5%_0,80%_8px,82.5%_0,85%_8px,87.5%_0,90%_8px,92.5%_0,95%_8px,97.5%_0,100%_8px,100%_100%,0_100%)]">
+            <div ref={ticketRef} className="print-area bg-white shadow-sm p-6 [clip-path:polygon(0_8px,2.5%_0,5%_8px,7.5%_0,10%_8px,12.5%_0,15%_8px,17.5%_0,20%_8px,22.5%_0,25%_8px,27.5%_0,30%_8px,32.5%_0,35%_8px,37.5%_0,40%_8px,42.5%_0,45%_8px,47.5%_0,50%_8px,52.5%_0,55%_8px,57.5%_0,60%_8px,62.5%_0,65%_8px,67.5%_0,70%_8px,72.5%_0,75%_8px,77.5%_0,80%_8px,82.5%_0,85%_8px,87.5%_0,90%_8px,92.5%_0,95%_8px,97.5%_0,100%_8px,100%_100%,0_100%)]">
               <div className="flex justify-between items-start mb-1 mt-2">
                 {ajustes.logo ? (
                   <img src={ajustes.logo} alt="Logo Negocio" className="w-16 h-16 object-contain shrink-0" />
@@ -666,7 +666,7 @@ function TicketPanel({ venta, ajustes, onClose, onPersonalizar }) {
               <p className="text-center text-[11px] text-gray-400 mt-1">{fechaLarga} · {venta.fecha || fmtHora(getTimestamp(venta))} · {ajustes.nombre}</p>
             </div>
           ) : (
-            <div ref={ticketRef} className="bg-white shadow-sm rounded-xl p-6">
+            <div ref={ticketRef} className="print-area bg-white shadow-sm rounded-xl p-6">
               <div className="flex justify-between items-start mb-5">
                 <div className="flex gap-3 items-center">
                   {ajustes.logo && <img src={ajustes.logo} alt="Logo Negocio" className="w-16 h-16 object-contain shrink-0" />}
