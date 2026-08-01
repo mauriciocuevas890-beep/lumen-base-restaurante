@@ -1782,14 +1782,14 @@ function ViewRepartidor({ ordenes, onAvanzarEstado, onRegistrarCobro }) {
                 )}
                 
                 {o.estadoEntrega === 'Confirmado' && (
-                  <button onClick={() => onAvanzarEstado(o)} className="flex-[2] bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-2xl flex justify-center items-center gap-2 text-sm transition-colors shadow-lg shadow-blue-600/20">
+                  <button onClick={() => onAvanzarEstado(o.id)} className="flex-[2] bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-2xl flex justify-center items-center gap-2 text-sm transition-colors shadow-lg shadow-blue-600/20">
                     <Bike className="w-4 h-4" /> Iniciar Ruta
                   </button>
                 )}
                 
                 {o.estadoEntrega === 'En camino' && (
                   <button onClick={() => {
-                    onAvanzarEstado(o);
+                    onAvanzarEstado(o.id);
                     if (!o.pagado) {
                       onRegistrarCobro(o);
                     }
@@ -2780,7 +2780,7 @@ function PosApp({ negocioId, negocioNombre, sesion, negocios, rol, onCambiarNego
       id: `V-${ahoraTs}`, folio, ts: ahoraTs, fecha: horaActual(), hora24: new Date(ahoraTs).getHours(),
       items: [...cart], subtotal: subtotalCarrito, descuento, impuesto: impuestoMonto,
       impuestoDesc: ajustes.impuestoDesc, total: totalCarrito,
-      cliente: cliente?.nombre || null, entrega: { ...entrega }, nota,
+      cliente: cliente?.nombre || null, clienteTel: cliente?.telefono || null, entrega: { ...entrega }, nota,
       mesa: mesaActiva ? mesaActiva.num : null, ...extra,
     };
   };
