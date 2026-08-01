@@ -1751,7 +1751,7 @@ function ViewRepartidor({ ordenes, onAvanzarEstado, onRegistrarCobro }) {
               <div className="space-y-3 mb-5">
                 <div className="flex items-start gap-3 text-gray-600">
                   <MapPin className="w-5 h-5 shrink-0 text-gray-400 mt-0.5" />
-                  <span className="text-sm">{o.entrega?.direccion || 'Dirección no especificada'}</span>
+                  <span className="text-sm">{o.entrega?.domicilio || 'Dirección no especificada'}</span>
                 </div>
                 {o.clienteTel && (
                   <div className="flex items-center gap-3 text-gray-600">
