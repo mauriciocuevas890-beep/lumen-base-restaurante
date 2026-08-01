@@ -1760,6 +1760,12 @@ function ViewRepartidor({ ordenes, onAvanzarEstado, onRegistrarCobro }) {
                     <span className="text-sm">Dirección no especificada</span>
                   </div>
                 )}
+                {o.entrega?.detalles && (
+                  <div className="flex items-start gap-3 text-gray-500 bg-gray-50 p-3 rounded-2xl border border-gray-100">
+                    <StickyNote className="w-5 h-5 shrink-0 mt-0.5" />
+                    <span className="text-sm italic">{o.entrega.detalles}</span>
+                  </div>
+                )}
                 {o.clienteTel && (
                   <div className="flex items-center gap-3 text-gray-600">
                     <Phone className="w-5 h-5 shrink-0 text-gray-400" />
