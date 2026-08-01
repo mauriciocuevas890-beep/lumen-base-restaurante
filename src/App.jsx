@@ -606,8 +606,17 @@ function TicketPanel({ venta, ajustes, onClose, onPersonalizar }) {
   const imprimir = () => {
     if (typeof window === 'undefined') return;
     const printContainer = document.createElement('div');
-    printContainer.className = 'w-full max-w-sm mx-auto mt-8 bg-white'; 
-    printContainer.innerHTML = ticketRef.current.outerHTML;
+    // Se elimina el max-w-sm y el mt-8 para que abarque el 100% del ancho del papel térmico (58mm/80mm) sin márgenes extra
+    printContainer.className = 'w-full bg-white text-black'; 
+    printContainer.innerHTML = `
+      <style>
+        @media print {
+          @page { margin: 0; }
+          body { margin: 0; padding: 0; }
+        }
+      </style>
+      ${ticketRef.current.outerHTML}
+    `;
     document.body.appendChild(printContainer);
     
     const cleanup = () => {
