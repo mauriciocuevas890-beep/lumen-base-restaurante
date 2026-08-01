@@ -1694,6 +1694,118 @@ function NuevaTransaccion({ onClose, onGuardar, inicial }) {
   );
 }
 
+// ============ VISTA: REPARTIDOR (App Móvil para Motoristas) ============
+function ViewRepartidor({ ordenes, onAvanzarEstado, onRegistrarCobro }) {
+  const [tab, setTab] = useState('Pendientes'); // Pendientes | Historial
+  
+  const ordenesReparto = ordenes.filter(o => o.entrega?.modo === 'Reparto');
+  const pendientes = ordenesReparto.filter(o => ['Confirmado', 'En camino'].includes(o.estadoEntrega));
+  const historial = ordenesReparto.filter(o => o.estadoEntrega === 'Entregado');
+  
+  const mostradas = tab === 'Pendientes' ? pendientes : historial;
+
+  return (
+    <div className="p-4 w-full h-full bg-slate-50 overflow-y-auto pb-24">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-black text-gray-900 flex items-center gap-2">
+            <Bike className="w-7 h-7 text-blue-600" />
+            Mis Repartos
+          </h1>
+          <p className="text-gray-500 text-sm">Gestiona tus entregas activas</p>
+        </div>
+      </div>
+
+      <div className="flex bg-gray-200/50 p-1 rounded-2xl mb-6">
+        {['Pendientes', 'Historial'].map(t => (
+          <button key={t} onClick={() => setTab(t)}
+            className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${tab === t ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+            {t} {t === 'Pendientes' && pendientes.length > 0 && <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full ml-1">{pendientes.length}</span>}
+          </button>
+        ))}
+      </div>
+
+      {mostradas.length === 0 ? (
+        <div className="text-center py-20 bg-white rounded-3xl shadow-sm border border-gray-100">
+          <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          <p className="text-gray-500 font-bold">No hay pedidos {tab.toLowerCase()}</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {mostradas.map(o => (
+            <div key={o.id} className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <span className="text-xs font-black text-gray-400">PEDIDO #{o.folio}</span>
+                  <h3 className="font-bold text-gray-900 text-lg leading-tight mt-1">{o.cliente || 'Sin Nombre'}</h3>
+                </div>
+                <div className={`px-3 py-1 rounded-full text-xs font-bold ${
+                  o.estadoEntrega === 'En camino' ? 'bg-purple-100 text-purple-700' :
+                  o.estadoEntrega === 'Confirmado' ? 'bg-amber-100 text-amber-700' :
+                  'bg-emerald-100 text-emerald-700'
+                }`}>
+                  {o.estadoEntrega}
+                </div>
+              </div>
+
+              <div className="space-y-3 mb-5">
+                <div className="flex items-start gap-3 text-gray-600">
+                  <MapPin className="w-5 h-5 shrink-0 text-gray-400 mt-0.5" />
+                  <span className="text-sm">{o.entrega?.direccion || 'Dirección no especificada'}</span>
+                </div>
+                {o.clienteTel && (
+                  <div className="flex items-center gap-3 text-gray-600">
+                    <Phone className="w-5 h-5 shrink-0 text-gray-400" />
+                    <span className="text-sm font-bold">{o.clienteTel}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-gray-50 rounded-2xl p-4 mb-5 flex justify-between items-center">
+                <div>
+                  <p className="text-xs text-gray-500 mb-0.5">A cobrar</p>
+                  <p className="font-black text-xl text-gray-900">{money(o.total)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-gray-500 mb-0.5">Estado</p>
+                  <p className={`font-bold text-sm ${o.pagado ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    {o.pagado ? 'Pagado' : 'Pendiente de pago'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                {o.clienteTel && (
+                  <a href={`tel:${o.clienteTel.replace(/\D/g, '')}`} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3.5 rounded-2xl flex justify-center items-center gap-2 text-sm transition-colors">
+                    <Phone className="w-4 h-4" /> Llamar
+                  </a>
+                )}
+                
+                {o.estadoEntrega === 'Confirmado' && (
+                  <button onClick={() => onAvanzarEstado(o)} className="flex-[2] bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-2xl flex justify-center items-center gap-2 text-sm transition-colors shadow-lg shadow-blue-600/20">
+                    <Bike className="w-4 h-4" /> Iniciar Ruta
+                  </button>
+                )}
+                
+                {o.estadoEntrega === 'En camino' && (
+                  <button onClick={() => {
+                    onAvanzarEstado(o);
+                    if (!o.pagado) {
+                      onRegistrarCobro(o);
+                    }
+                  }} className="flex-[2] bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3.5 rounded-2xl flex justify-center items-center gap-2 text-sm transition-colors shadow-lg shadow-emerald-500/20">
+                    <Check className="w-4 h-4" /> Entregado
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ============ VISTA: MESAS (croquis funcional estilo Yimi) ============
 function ViewMesas({ ajustes, ordenes, onAbrirLibre, onEditarCuenta, onCobrar, onVerTicket, onCancelarCuenta }) {
   const [sel, setSel] = useState(null); // mesa seleccionada (para el panel)
@@ -2559,7 +2671,7 @@ function PosApp({ negocioId, negocioNombre, sesion, negocios, rol, onCambiarNego
   const [ajustes, setAjustes] = useState(AJUSTES_DEFAULT);
   const NEGOCIO = ajustes.nombre;
   // Recuerda la sección al recargar la página (no vuelve a Inicio).
-  const VISTAS_OK = ['inicio', 'vender', 'pedidos', 'mesas', 'productos', 'finanzas', 'reportes', 'ajustes', 'crear-producto'];
+  const VISTAS_OK = ['inicio', 'vender', 'pedidos', 'mesas', 'productos', 'finanzas', 'reportes', 'ajustes', 'crear-producto', 'repartidor'];
   const [vista, setVista] = useState(() => {
     try { const v = localStorage.getItem('lumen_pos_vista'); return VISTAS_OK.includes(v) ? v : 'inicio'; }
     catch (e) { return 'inicio'; }
@@ -2850,6 +2962,7 @@ function PosApp({ negocioId, negocioNombre, sesion, negocios, rol, onCambiarNego
   const navItems = [
     { id: 'inicio', label: 'Inicio', icon: Home },
     { id: 'pedidos', label: 'Pedidos', icon: ClipboardList },
+    { id: 'repartidor', label: 'Repartidor', icon: Bike },
     ...(ajustes.activarMesas ? [{ id: 'mesas', label: 'Mesas', icon: Utensils }] : []),
     { id: 'productos', label: 'Productos', icon: Package },
     { id: 'finanzas', label: 'Finanzas', icon: Landmark },
@@ -2967,6 +3080,11 @@ function PosApp({ negocioId, negocioNombre, sesion, negocios, rol, onCambiarNego
               onCancelar={cancelarPedido}
               onEliminar={eliminarPedido}
               onLimpiarCanceladas={limpiarCanceladas} />
+          </div>
+        )}
+        {vista === 'repartidor' && (
+          <div className="h-full overflow-y-auto bg-slate-50">
+            <ViewRepartidor ordenes={ordenes} onAvanzarEstado={avanzarEstado} onRegistrarCobro={o => setOrdenCobro(o)} />
           </div>
         )}
         {vista === 'productos' && (
@@ -3190,3 +3308,4 @@ export default function App() {
     />
   );
 }
+
