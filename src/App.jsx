@@ -624,15 +624,22 @@ function TicketPanel({ venta, ajustes, onClose, onPersonalizar }) {
         <div className="flex-1 overflow-y-auto p-5 bg-gray-50/60">
           {tab === 'Ticket' ? (
             <div ref={ticketRef} className="bg-white shadow-sm p-6 [clip-path:polygon(0_8px,2.5%_0,5%_8px,7.5%_0,10%_8px,12.5%_0,15%_8px,17.5%_0,20%_8px,22.5%_0,25%_8px,27.5%_0,30%_8px,32.5%_0,35%_8px,37.5%_0,40%_8px,42.5%_0,45%_8px,47.5%_0,50%_8px,52.5%_0,55%_8px,57.5%_0,60%_8px,62.5%_0,65%_8px,67.5%_0,70%_8px,72.5%_0,75%_8px,77.5%_0,80%_8px,82.5%_0,85%_8px,87.5%_0,90%_8px,92.5%_0,95%_8px,97.5%_0,100%_8px,100%_100%,0_100%)]">
-              <div className="text-right mb-1 mt-2">
-                <p className="text-2xl font-black" style={{ color: ajustes.colorTicket }}>Ticket</p>
-                <p className="font-bold text-gray-900">#{venta.folio}</p>
-                {venta.pagado
-                  ? <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full"><Check className="w-3 h-3" /> Pagado</span>
-                  : <span className="inline-flex items-center gap-1 text-xs font-bold text-rose-700 bg-rose-50 border border-rose-300 px-2 py-0.5 rounded-full">Pago pendiente</span>}
+              <div className="flex justify-between items-start mb-1 mt-2">
+                {ajustes.logo ? (
+                  <img src={ajustes.logo} alt="Logo Negocio" className="w-16 h-16 object-contain shrink-0" />
+                ) : (
+                  <div></div>
+                )}
+                <div className="text-right">
+                  <p className="text-2xl font-black" style={{ color: ajustes.colorTicket }}>Ticket</p>
+                  <p className="font-bold text-gray-900">#{venta.folio}</p>
+                  {venta.pagado
+                    ? <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full mt-1"><Check className="w-3 h-3" /> Pagado</span>
+                    : <span className="inline-flex items-center gap-1 text-xs font-bold text-rose-700 bg-rose-50 border border-rose-300 px-2 py-0.5 rounded-full mt-1">Pago pendiente</span>}
+                </div>
               </div>
-              {ajustes.encabezado && <p className="text-xs text-gray-500 mb-1">{ajustes.encabezado}</p>}
-              <p className="font-black text-gray-900 text-lg">{ajustes.nombre}</p>
+              {ajustes.encabezado && <p className="text-xs text-gray-500 mb-1 mt-3">{ajustes.encabezado}</p>}
+              <p className="font-black text-gray-900 text-lg mt-1">{ajustes.nombre}</p>
               <p className="text-xs text-gray-500 mb-2">{ajustes.whatsapp ? `+52 ${ajustes.whatsapp} · ` : ''}{ajustes.calle || ''}{ajustes.detallesDir ? ` · ${ajustes.detallesDir}` : ''}</p>
               {ajustes.mostrarDatosCliente && (
                 <p className="text-sm text-gray-800 font-bold border-t border-gray-100 pt-2">{venta.cliente || 'Mostrador'}</p>
@@ -661,9 +668,12 @@ function TicketPanel({ venta, ajustes, onClose, onPersonalizar }) {
           ) : (
             <div ref={ticketRef} className="bg-white shadow-sm rounded-xl p-6">
               <div className="flex justify-between items-start mb-5">
-                <div>
-                  <p className="text-2xl font-black" style={{ color: ajustes.colorTicket }}>Factura</p>
-                  <p className="text-xs text-gray-500 font-bold">INV{String(venta.folio).padStart(4, '0')}</p>
+                <div className="flex gap-3 items-center">
+                  {ajustes.logo && <img src={ajustes.logo} alt="Logo Negocio" className="w-16 h-16 object-contain shrink-0" />}
+                  <div>
+                    <p className="text-2xl font-black" style={{ color: ajustes.colorTicket }}>Factura</p>
+                    <p className="text-xs text-gray-500 font-bold">INV{String(venta.folio).padStart(4, '0')}</p>
+                  </div>
                 </div>
                 <div className="text-right text-sm">
                   <p className="text-gray-500">Fecha</p>
