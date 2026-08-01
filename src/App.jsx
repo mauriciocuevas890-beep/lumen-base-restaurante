@@ -1749,10 +1749,17 @@ function ViewRepartidor({ ordenes, onAvanzarEstado, onRegistrarCobro }) {
               </div>
 
               <div className="space-y-3 mb-5">
-                <div className="flex items-start gap-3 text-gray-600">
-                  <MapPin className="w-5 h-5 shrink-0 text-gray-400 mt-0.5" />
-                  <span className="text-sm">{o.entrega?.domicilio || 'Dirección no especificada'}</span>
-                </div>
+                {o.entrega?.domicilio ? (
+                  <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(o.entrega.domicilio)}`} target="_blank" rel="noreferrer" className="flex items-start gap-3 text-gray-700 hover:text-blue-700 transition-colors bg-blue-50/50 p-3 rounded-2xl border border-blue-100">
+                    <MapPin className="w-5 h-5 shrink-0 text-blue-500 mt-0.5" />
+                    <span className="text-sm font-bold underline decoration-blue-500/30 underline-offset-2">{o.entrega.domicilio}</span>
+                  </a>
+                ) : (
+                  <div className="flex items-start gap-3 text-gray-400 p-3">
+                    <MapPin className="w-5 h-5 shrink-0 mt-0.5" />
+                    <span className="text-sm">Dirección no especificada</span>
+                  </div>
+                )}
                 {o.clienteTel && (
                   <div className="flex items-center gap-3 text-gray-600">
                     <Phone className="w-5 h-5 shrink-0 text-gray-400" />
