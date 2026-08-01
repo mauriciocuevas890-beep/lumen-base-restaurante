@@ -602,6 +602,26 @@ function TicketPanel({ venta, ajustes, onClose, onPersonalizar }) {
     bajarBlob(blob, nombreArchivo);
     alert('Tu dispositivo no permite compartir directamente; descargué la imagen del ticket para que la envíes.');
   };
+
+  const imprimir = () => {
+    if (typeof window === 'undefined') return;
+    const printContainer = document.createElement('div');
+    printContainer.className = 'w-full max-w-sm mx-auto mt-8 bg-white'; 
+    printContainer.innerHTML = ticketRef.current.outerHTML;
+    document.body.appendChild(printContainer);
+    
+    const cleanup = () => {
+      if (document.body.contains(printContainer)) {
+        document.body.removeChild(printContainer);
+      }
+      window.removeEventListener('afterprint', cleanup);
+    };
+    window.addEventListener('afterprint', cleanup);
+    setTimeout(cleanup, 3000);
+    
+    window.print();
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/30 print:static print:bg-white print:inset-auto" onClick={onClose}>
       <div className="bg-white w-full max-w-lg h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-200 print:shadow-none print:w-full print:max-w-none print:h-auto print:block" onClick={e => e.stopPropagation()}>
@@ -714,7 +734,7 @@ function TicketPanel({ venta, ajustes, onClose, onPersonalizar }) {
           )}
         </div>
         <div className="p-4 border-t border-gray-100 grid grid-cols-3 gap-3 print:hidden">
-          <button onClick={() => typeof window !== 'undefined' && window.print && window.print()} className="bg-blue-600 hover:bg-blue-700 text-white rounded-2xl py-3.5 flex flex-col items-center gap-1 font-bold text-sm"><Printer className="w-5 h-5" /> Imprimir</button>
+          <button onClick={imprimir} className="bg-blue-600 hover:bg-blue-700 text-white rounded-2xl py-3.5 flex flex-col items-center gap-1 font-bold text-sm"><Printer className="w-5 h-5" /> Imprimir</button>
           <button onClick={descargar} className="border border-gray-200 hover:bg-gray-50 text-gray-800 rounded-2xl py-3.5 flex flex-col items-center gap-1 font-bold text-sm"><Download className="w-5 h-5" /> Descargar</button>
           <button onClick={compartir} className="border border-gray-200 hover:bg-gray-50 text-gray-800 rounded-2xl py-3.5 flex flex-col items-center gap-1 font-bold text-sm"><Share2 className="w-5 h-5" /> Compartir</button>
         </div>
